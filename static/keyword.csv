@@ -1,0 +1,40 @@
+﻿keyword_id,keyword_content,score,problem_id
+k_0,저장위치 - 2점,2.00,mstr_nw_1
+k_1,보안 - 1점,1.00,mstr_nw_1
+k_2,Lifecycle - 1점,1.00,mstr_nw_1
+k_3,속도 - 1점,1.00,mstr_nw_1
+k_4,stateless - 2점,2.00,mstr_nw_2
+k_5,동일한 요청 - 2점,2.00,mstr_nw_2
+k_6,POST - 1점,1.00,mstr_nw_2
+k_7,프로그램 - 2점,2.00,mstr_os_2
+k_8,작업단위 - 1점,1.00,mstr_os_2
+k_9,Stack - 2점,2.00,mstr_os_2
+k_10,상호 배제 - 1.25점,1.25,mstr_os_1
+k_11,점유 대기 - 1.25점,1.25,mstr_os_1
+k_12,비선점 - 1.25점,1.25,mstr_os_1
+k_13,순환 대기 - 1.25점,1.25,mstr_os_1
+k_14,식별자 - 1점,1.00,mstr_db_1
+k_15,유일성 - 1점,1.00,mstr_db_1
+k_16,최소성 - 1점,1.00,mstr_db_1
+k_17,불변성 - 1점,1.00,mstr_db_1
+k_18,대표성 - 1점,1.00,mstr_db_1
+k_19,카디널리티 - 1.25점,1.25,mstr_db_3
+k_20,선택도 - 1.25점,1.25,mstr_db_3
+k_21,수정 빈도 - 1.25점,1.25,mstr_db_3
+k_22,조회 빈도 - 1.25점,1.25,mstr_db_3
+k_23,원자성 - 1.25 점,1.25,mstr_db_2
+k_24,일관성 - 1.25 점,1.25,mstr_db_2
+k_25,독립성 - 1.25 점,1.25,mstr_db_2
+k_26,지속성 - 1.25 점,1.25,mstr_db_2
+k_27,저장 순서 - 2점,2.00,mstr_ds_1
+k_28,시간 복잡도 - 1점,1.00,mstr_ds_1
+k_29,랜덤 액세스 -2점,2.00,mstr_ds_1
+k_30,LIFO - 2점,2.00,mstr_ds_2
+k_31,삽입 - 1점,1.00,mstr_ds_2
+k_32,삭제 - 1점,1.00,mstr_ds_2
+k_33,DFS - 1점,1.00,mstr_ds_2
+k_34,FIFO - 2점,2.00,mstr_ds_3
+k_35,삽입 - 1점,1.00,mstr_ds_3
+k_36,삭제 - 1점,1.00,mstr_ds_3
+k_37,BFS - 1점,1.00,mstr_ds_3
+,,,
