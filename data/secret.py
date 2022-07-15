@@ -22,7 +22,7 @@ def get_secret() -> dict:
         get_secret_value_response = client.get_secret_value(
             SecretId=secret_name
         )
-    except ClientError as e:
+    except ClientError as e:  # Todo : Exception에 대한 정의후에 Exception 남기기
         if e.response['Error']['Code'] == 'DecryptionFailureException':
             # Secrets Manager can't decrypt the protected secret text using the provided KMS key.
             # Deal with the exception here, and/or rethrow at your discretion.

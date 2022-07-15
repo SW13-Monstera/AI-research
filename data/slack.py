@@ -80,7 +80,7 @@ def air_table_text_parsing(text: str) -> list:
                 start = i
                 break
 
-        for i in range(len(_text) - 1, -1, -1):
+        for i in range(len(_text) - 1, start - 1, -1):
             if _text[i] != '\n':
                 end = i
                 break
@@ -98,11 +98,11 @@ def air_table_text_parsing(text: str) -> list:
         user_answer, data = data.split('*reference:*')
         reference, data = data.split('*is_uploaded:*')
         answer_data = {
-            "data_id": remove_newline(data_id),
-            "problem_id": remove_newline(problem_id),
-            "assign": remove_newline(assign),
-            "keyword_content": remove_newline(keyword_content),
-            "sim_content": remove_newline(sim_content),
+            'data_id': remove_newline(data_id),
+            'problem_id': remove_newline(problem_id),
+            'assign': remove_newline(assign),
+            'keyword_content': remove_newline(keyword_content),
+            'sim_content': remove_newline(sim_content),
             'problem': remove_newline(problem),
             'user_answer': remove_newline(user_answer),
             'reference': remove_newline(reference)
