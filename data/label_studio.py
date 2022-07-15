@@ -20,5 +20,5 @@ class LabelStudioAPI:
             print(self.project.import_tasks(new_data))
 
     def _get_data_id_set(self) -> set:
-        data_id_set = set((task['data']['data_id'] for task in self.project.get_tasks()))
+        data_id_set = set(task['data']['data_id'] for task in self.project.get_tasks())
         return data_id_set

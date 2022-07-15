@@ -1,4 +1,3 @@
-
 from data.air_table import get_required_labelling_record
 from data.label_studio import LabelStudioAPI
 from core import config as settings
