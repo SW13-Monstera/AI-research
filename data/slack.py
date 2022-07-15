@@ -1,4 +1,5 @@
 from slack_sdk import WebClient
+from slack_sdk.web import SlackResponse
 
 
 class SlackAPI:
@@ -6,11 +7,11 @@ class SlackAPI:
     슬랙 API 핸들러
     """
 
-    def __init__(self, token):
+    def __init__(self, token) -> None:
         # 슬랙 클라이언트 인스턴스 생성
         self.client = WebClient(token)
 
-    def get_channel_id(self, channel_name):
+    def get_channel_id(self, channel_name) -> str:
         """
         슬랙 채널ID 조회
         """
@@ -24,7 +25,7 @@ class SlackAPI:
         channel_id = channel["id"]
         return channel_id
 
-    def get_message_ts(self, channel_id, query):
+    def get_message_ts(self, channel_id, query) -> list:
         """
         슬랙 채널 내 메세지 조회
         """
@@ -38,7 +39,7 @@ class SlackAPI:
         message_ts = message["ts"]
         return message_ts
 
-    def post_thread_message(self, channel_id, message_ts, text):
+    def post_thread_message(self, channel_id, message_ts, text) -> SlackResponse:
         """
         슬랙 채널 내 메세지의 Thread에 댓글 달기
         """
@@ -50,7 +51,7 @@ class SlackAPI:
         )
         return result
 
-    def post_message(self, channel_id, text):
+    def post_message(self, channel_id, text) -> SlackResponse:
         result = self.client.chat_postMessage(
             channel=channel_id,
             text=text
@@ -73,9 +74,9 @@ class SlackAPI:
         return user_messages
 
 
-def air_table_text_parsing(text: str):
+def air_table_text_parsing(text: str) -> list:
 
-    def remove_newline(_text: str):
+    def remove_newline(_text: str) -> str:
         start, end = 0, len(_text)
         for i in range(len(_text)):
             if _text[i] != '\n':
