@@ -65,9 +65,6 @@ class SlackAPI:
         user_messages = []
         for message in messages:
             if 'username' in message and username == message['username']:
-                print(message['username'])
-                print(message['ts'])
-                print(message['text'][:20])
                 user_messages.append(message)
         user_messages.sort(key=lambda msg: float(msg['ts']))
 
