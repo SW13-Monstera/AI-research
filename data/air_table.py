@@ -7,7 +7,7 @@ from core import config as settings
 
 def check_valid_score(data: dict) -> None:
     for key in data:
-        assert data[key], f"problem id : {key}\n 키워드, 유사도 점수의 합은 항상 각각 5점 이어야 합니다!!"
+        assert data[key] == 5, f"problem id : {key}\n 키워드, 유사도 점수의 합은 항상 각각 5점 이어야 합니다!!"
 
 
 def get_keyword() -> Tuple[dict, defaultdict]:
