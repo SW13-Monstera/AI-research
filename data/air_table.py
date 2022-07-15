@@ -22,6 +22,7 @@ def get_keyword() -> Tuple[dict, defaultdict]:
         score = keyword['fields']['score']
         keyword_id = keyword['fields']['keyword_id']
         problem_keywords_score[problem_id] += score
+        problem_keywords[problem_id].append(keyword_id)
         keywords[keyword_id] = keyword['fields']['keyword_content']
 
     check_valid_score(problem_keywords_score)
@@ -47,7 +48,7 @@ def get_similarity() -> Tuple[dict, defaultdict]:
     return similarities, problem_similarities
 
 
-def get_required_labelling_record():
+def get_required_labelling_record() -> list:
     table = Airtable(settings.AIR_TABLE_APP_NAME, "main", settings.AIR_TABLE_API_KEY)
     records = table.get_all(view="채점이 필요한 데이터")
     keyword_dict, problem_keywords = get_keyword()
@@ -65,8 +66,10 @@ def get_required_labelling_record():
             similarity_list.append({"alias": similarity_id, "value": similarity_dict[similarity_id]})
         json_data['keyword_list'] = keyword_list
         json_data['sim_list'] = similarity_list
+        json_data['problem_id'] = json_data['problem_id'][0]
+        json_data['assign'] = json_data['assign'][0]
+        json_data['problem'] = json_data['problem'][0]
         json_data.pop('sim_content')
         json_data.pop('keyword_content')
         convert_data.append(json_data)
-
-    # Todo: label studio에 있는 데이터인지 확인 후 import 하기
+    return convert_data
