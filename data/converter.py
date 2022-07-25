@@ -22,7 +22,7 @@ def preprocessing_csv(answer_path: str, keyword_path: str, similarity_path: str)
     keyword_pd = pd.read_csv(keyword_path)
     similarity_pd = pd.read_csv(similarity_path)
 
-    for i, answer_row in answer_pd.iterrows():
+    for _, answer_row in answer_pd.iterrows():
         json_data = dict(answer_row.where(pd.notnull(answer_row), None))
         keyword_list = []
         sim_list = []
