@@ -32,8 +32,3 @@ def transform_required_csv_form_from_label_studio() -> None:
         for labeled_task in labeled_tasks:
             writer.writerow([getattr(labeled_task, field) for field in field_list])
 
-
-if __name__ == '__main__':
-    transform_required_csv_form_from_label_studio()
-    # delete_problem_in_label_studio(problem="[자료구조 3]")
-    # upload_unlabeled_data_to_label_studio_from_air_table()
