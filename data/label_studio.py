@@ -61,8 +61,7 @@ class LabelStudioAPI:
 
             for annotation in annotations:
                 if isinstance(annotation['value'], dict):  # 선택지가 여러개인 경우
-                    for choice in annotation['value']['choices']:
-                        choice = choice[0]
+                    for choice, *res in annotation['value']['choices']:
                         if annotation['from_name'] == SCORING_ANNOTATION:
                             scoring_annotation.append(scoring_criterion_dict[choice])
                         elif annotation['from_name'] == KEYWORD_ANNOTATION:
