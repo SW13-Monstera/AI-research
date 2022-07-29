@@ -43,8 +43,8 @@ class LabelStudioAPI:
             )
         print(f"{len(id_list)}개의 task 삭제 완료!")
 
-    def get_labelled_tasks(self) -> list:
-        labelled_tasks = []
+    def get_labeled_tasks(self) -> list:
+        labeled_tasks = []
         for task in self.project.get_labeled_tasks():
             scoring_criterion_dict = {
                 criterion['alias']: criterion['value']
@@ -61,8 +61,7 @@ class LabelStudioAPI:
 
             for annotation in annotations:
                 if isinstance(annotation['value'], dict):  # 선택지가 여러개인 경우
-                    for choice in annotation['value']['choices']:
-                        choice = choice[0]
+                    for choice, *_ in annotation['value']['choices']:
                         if annotation['from_name'] == SCORING_ANNOTATION:
                             scoring_annotation.append(scoring_criterion_dict[choice])
                         elif annotation['from_name'] == KEYWORD_ANNOTATION:
@@ -83,5 +82,5 @@ class LabelStudioAPI:
                 correct_keyword_criterion=keyword_annotation,
                 annotator=task['annotations'][-1]['created_username'].split(',')[0].strip(),
             )
-            labelled_tasks.append(user_answer)
-        return labelled_tasks
+            labeled_tasks.append(user_answer)
+        return labeled_tasks
