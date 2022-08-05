@@ -1,6 +1,7 @@
-import pandas as pd
 import argparse
 import json
+
+import pandas as pd
 
 
 def preprocessing_csv(answer_path: str, keyword_path: str, similarity_path: str):
@@ -18,7 +19,7 @@ def preprocessing_csv(answer_path: str, keyword_path: str, similarity_path: str)
     """
     convert_data = []
     answer_pd = pd.read_csv(answer_path)
-    answer_pd.drop(columns=['keyword_content', 'sim_content'], inplace=True)
+    answer_pd.drop(columns=["keyword_content", "sim_content"], inplace=True)
     keyword_pd = pd.read_csv(keyword_path)
     similarity_pd = pd.read_csv(similarity_path)
 
@@ -28,28 +29,33 @@ def preprocessing_csv(answer_path: str, keyword_path: str, similarity_path: str)
         sim_list = []
         score = []
         for i, keyword_row in keyword_pd.iterrows():
-            if keyword_row['problem_id'] == answer_row['problem_id']:
-                keyword_list.append({"alias": keyword_row['keyword_id'], "value": keyword_row['keyword_content']})
-                score.append(keyword_row['score'])
+            if keyword_row["problem_id"] == answer_row["problem_id"]:
+                keyword_list.append(
+                    {
+                        "alias": keyword_row["keyword_id"],
+                        "value": keyword_row["keyword_content"],
+                    }
+                )
+                score.append(keyword_row["score"])
         assert sum(score) == 5, "keyword score의 합은 5점 이어야 합니다!!"
         score.clear()
         for i, sim_row in similarity_pd.iterrows():
-            if sim_row['problem_id'] == answer_row['problem_id']:
-                sim_list.append({"alias": sim_row['sim_id'], "value": sim_row['sim_content']})
-                score.append(sim_row['score'])
+            if sim_row["problem_id"] == answer_row["problem_id"]:
+                sim_list.append({"alias": sim_row["sim_id"], "value": sim_row["sim_content"]})
+                score.append(sim_row["score"])
         assert sum(score) == 5, f"{answer_row}similarity score의 합은 5점 이어야 합니다!!"
-        json_data['keyword_list'] = keyword_list
-        json_data['sim_list'] = sim_list
+        json_data["keyword_list"] = keyword_list
+        json_data["sim_list"] = sim_list
         convert_data.append(json_data)
 
-    with open('static/answer.json', 'w') as f:
+    with open("static/answer.json", "w") as f:
         json.dump(convert_data, f)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--answer_path', type=str, default='static/answer.csv')
-    parser.add_argument('--keyword_path', type=str, default='static/keyword.csv')
-    parser.add_argument('--similarity_path', type=str, default='static/similarity.csv')
+    parser.add_argument("--answer_path", type=str, default="static/answer.csv")
+    parser.add_argument("--keyword_path", type=str, default="static/keyword.csv")
+    parser.add_argument("--similarity_path", type=str, default="static/similarity.csv")
     args = parser.parse_args()
     preprocessing_csv(args.answer_path, args.keyword_path, args.similarity_path)
