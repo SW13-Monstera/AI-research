@@ -172,3 +172,26 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             if step % logging_steps == 0:
                 print(f"Epoch {epoch}, average loss: {total_loss / (step + 1)}")
+
+        print("여기부터 validation check 시작")
+        validation_loss = 0
+        prompt_model.eval()
+        for step, inputs in enumerate(validation_data_loader):
+            inputs = inputs.to(device)
+            logits = prompt_model(inputs)
+            labels = inputs.label
+            loss = criterion(logits, labels)
+            validation_loss += loss.item()
+
+        print(f"Epoch {epoch}, validation loss: {validation_loss / (step + 1)}")
+
+    # final testing
+    test_loss = 0
+    for step, inputs in enumerate(test_data_loader):  # Todo: inputs부터 loss까지 모듈화하기
+        inputs = inputs.to(device)
+        logits = prompt_model(inputs)
+        labels = inputs.label
+        loss = criterion(logits, labels)
+        test_loss += loss.item()
+
+    print(f"Final test loss: {test_loss / (step + 1)}")
