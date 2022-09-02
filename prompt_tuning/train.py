@@ -5,6 +5,7 @@ from openprompt import PromptDataLoader, PromptForClassification
 from openprompt.data_utils import InputExample
 from openprompt.plms import T5TokenizerWrapper, load_plm
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
+from torch.optim import AdamW
 
 from core.utils import seed_everything
 from datasets import load_dataset
@@ -12,7 +13,7 @@ from datasets import load_dataset
 if __name__ == "__main__":
     seed = 42
     task = "nli"
-
+    lr = 1e-4
     seed_everything(seed)
     dataset = load_dataset("klue", task)
     prompt_input_dataset = {"train": [], "validation": [], "test": []}
@@ -91,6 +92,34 @@ if __name__ == "__main__":
         truncate_method="head",
     )
 
+    validation_data_loader = PromptDataLoader(
+        dataset=prompt_input_dataset["validation"],
+        template=template,
+        tokenizer=tokenizer,
+        tokenizer_wrapper_class=T5TokenizerWrapper,
+        max_seq_length=256,  # openprompt 에서 time hinting 실수한 듯 -> open source 기여 각?
+        decoder_max_length=3,
+        batch_size=4,
+        # shuffle=True,  # seed 고정 되는지 확인 후 True 설정
+        teacher_forcing=False,
+        predict_eos_token=False,
+        truncate_method="head",
+    )
+
+    test_data_loader = PromptDataLoader(
+        dataset=prompt_input_dataset["test"],
+        template=template,
+        tokenizer=tokenizer,
+        tokenizer_wrapper_class=T5TokenizerWrapper,
+        max_seq_length=256,  # openprompt 에서 time hinting 실수한 듯 -> open source 기여 각?
+        decoder_max_length=3,
+        batch_size=4,
+        # shuffle=True,  # seed 고정 되는지 확인 후 True 설정
+        teacher_forcing=False,
+        predict_eos_token=False,
+        truncate_method="head",
+    )
+
     verbalizer = ManualVerbalizer(
         tokenizer=tokenizer,
         num_classes=3,  # 여기도 string으로 되어있는데 내부 고민
@@ -106,7 +135,7 @@ if __name__ == "__main__":
     )  # freeze 고려
     prompt_model.to(device)
 
-    loss = torch.nn.CrossEntropyLoss()  # loss 생각해보기
+    criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
@@ -126,3 +155,20 @@ if __name__ == "__main__":
             "weight_decay": 0.0,
         },
     ]
+
+    optimizer = AdamW(optimizer_grouped_parameters, lr=lr)
+    logging_steps = 100
+    for epoch in range(10):
+        total_loss = 0
+        prompt_model.train()
+        for step, inputs in enumerate(train_data_loader):
+            inputs = inputs.to(device)
+            logits = prompt_model(inputs)
+            labels = inputs.label
+            loss = criterion(logits, labels)
+            loss.backword()
+            total_loss += loss.item()
+            optimizer.step()
+            optimizer.zero_grad()
+            if step % logging_steps == 0:
+                print(f"Epoch {epoch}, average loss: {total_loss / (step + 1)}")
