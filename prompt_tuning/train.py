@@ -10,6 +10,15 @@ from torch.optim import AdamW
 from core.utils import seed_everything
 from datasets import load_dataset
 
+
+def get_loss(inputs, prompt_model, criterion, device):
+    inputs = inputs.to(device)
+    logits = prompt_model(inputs)
+    labels = inputs.label
+    loss = criterion(logits, labels)
+    return loss
+
+
 if __name__ == "__main__":
     seed = 42
     task = "nli"
@@ -162,25 +171,21 @@ if __name__ == "__main__":
         total_loss = 0
         prompt_model.train()
         for step, inputs in enumerate(train_data_loader):
-            inputs = inputs.to(device)
-            logits = prompt_model(inputs)
-            labels = inputs.label
-            loss = criterion(logits, labels)
-            loss.backword()
+            loss = get_loss(inputs, prompt_model, criterion, device)
+            loss.backward()
             total_loss += loss.item()
             optimizer.step()
             optimizer.zero_grad()
             if step % logging_steps == 0:
-                print(f"Epoch {epoch}, average loss: {total_loss / (step + 1)}")
+                print(
+                    f"Epoch {epoch}, step: {step} average loss: {total_loss / (step + 1)}"
+                )
 
         print("여기부터 validation check 시작")
         validation_loss = 0
         prompt_model.eval()
         for step, inputs in enumerate(validation_data_loader):
-            inputs = inputs.to(device)
-            logits = prompt_model(inputs)
-            labels = inputs.label
-            loss = criterion(logits, labels)
+            loss = get_loss(inputs, prompt_model, criterion, device)
             validation_loss += loss.item()
 
         print(f"Epoch {epoch}, validation loss: {validation_loss / (step + 1)}")
@@ -188,10 +193,7 @@ if __name__ == "__main__":
     # final testing
     test_loss = 0
     for step, inputs in enumerate(test_data_loader):  # Todo: inputs부터 loss까지 모듈화하기
-        inputs = inputs.to(device)
-        logits = prompt_model(inputs)
-        labels = inputs.label
-        loss = criterion(logits, labels)
+        loss = get_loss(inputs, prompt_model, criterion, device)
         test_loss += loss.item()
 
     print(f"Final test loss: {test_loss / (step + 1)}")
