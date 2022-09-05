@@ -139,6 +139,7 @@ if __name__ == "__main__":
     print(verbalizer.process_logits(logits))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(device)
     prompt_model = PromptForClassification(
         plm=plm, template=template, verbalizer=verbalizer
     )  # freeze 고려
@@ -167,6 +168,7 @@ if __name__ == "__main__":
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=lr)
     logging_steps = 100
+    best_loss = 10000
     for epoch in range(10):
         total_loss = 0
         prompt_model.train()
@@ -180,15 +182,17 @@ if __name__ == "__main__":
                 print(
                     f"Epoch {epoch}, step: {step} average loss: {total_loss / (step + 1)}"
                 )
-
         print("여기부터 validation check 시작")
         validation_loss = 0
         prompt_model.eval()
         for step, inputs in enumerate(validation_data_loader):
             loss = get_loss(inputs, prompt_model, criterion, device)
             validation_loss += loss.item()
-
-        print(f"Epoch {epoch}, validation loss: {validation_loss / (step + 1)}")
+        validation_loss /= step + 1
+        print(f"Epoch {epoch}, validation loss: {validation_loss}")
+        if best_loss > validation_loss:
+            best_loss = validation_loss
+            torch.save(prompt_model.state_dict(), "./jw-mt5-base.bin")
 
     # final testing
     test_loss = 0
@@ -197,3 +201,4 @@ if __name__ == "__main__":
         test_loss += loss.item()
 
     print(f"Final test loss: {test_loss / (step + 1)}")
+    torch.save(prompt_model.state_dict(), "./jw-mt5-base-final.bin")
