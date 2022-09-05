@@ -1,28 +1,31 @@
 import random
 
+import pyrootutils
 import torch
+from loss import get_loss
 from openprompt import PromptDataLoader, PromptForClassification
 from openprompt.data_utils import InputExample
 from openprompt.plms import T5TokenizerWrapper, load_plm
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from torch.optim import AdamW
+from utils import seed_everything
 
-from core.utils import seed_everything
 from datasets import load_dataset
 
-
-def get_loss(inputs, prompt_model, criterion, device):
-    inputs = inputs.to(device)
-    logits = prompt_model(inputs)
-    labels = inputs.label
-    loss = criterion(logits, labels)
-    return loss
+root = pyrootutils.setup_root(
+    search_from=__file__,
+    indicator=[".git"],
+    pythonpath=True,
+    dotenv=True,
+)
 
 
 if __name__ == "__main__":
     seed = 42
-    task = "nli"
     lr = 1e-4
+    task = "nli"
+    model_name = "t5"
+    pretrain_model_path = "google/mt5-base"
     seed_everything(seed)
     dataset = load_dataset("klue", task)
     prompt_input_dataset = {"train": [], "validation": [], "test": []}
@@ -50,9 +53,9 @@ if __name__ == "__main__":
             prompt_input_dataset["validation"].append(input_example)
         else:
             prompt_input_dataset["test"].append(input_example)
-    pretrain_model_path = "google/mt5-base"
+
     plm, tokenizer, model_config, _ = load_plm(
-        model_name="t5",
+        model_name=model_name,
         model_path=pretrain_model_path,
     )
     special_tokens = ["</s>", "<unk>", "<pad>"]
@@ -64,8 +67,8 @@ if __name__ == "__main__":
     template_text = '{"placeholder":"text_a"} Question: {"placeholder":"text_b"}? Is it correct? {"mask"}.'
     template = ManualTemplate(tokenizer=tokenizer, text=template_text)
 
-    wrapped_example = template.wrap_one_example(prompt_input_dataset["train"][0])
-    print(wrapped_example)
+    # wrapped_example = template.wrap_one_example(prompt_input_dataset["train"][0])
+    # print(wrapped_example)
 
     wrapped_t5_tokenizer = T5TokenizerWrapper(
         max_seq_length=128,
@@ -74,12 +77,12 @@ if __name__ == "__main__":
         truncate_method="head",
     )
 
-    tokenized_example = wrapped_t5_tokenizer.tokenize_one_example(
-        wrapped_example, teacher_forcing=False
-    )
+    # tokenized_example = wrapped_t5_tokenizer.tokenize_one_example(
+    #     wrapped_example, teacher_forcing=False
+    # )
 
     model_inputs = {}
-    for split in ["train", "validation", "test"]:
+    for split in ["train", "val", "test"]:
         model_inputs[split] = []
         for data in prompt_input_dataset[split]:
             tokenized_example = wrapped_t5_tokenizer.tokenize_one_example(
@@ -102,7 +105,7 @@ if __name__ == "__main__":
     )
 
     validation_data_loader = PromptDataLoader(
-        dataset=prompt_input_dataset["validation"],
+        dataset=prompt_input_dataset["val"],
         template=template,
         tokenizer=tokenizer,
         tokenizer_wrapper_class=T5TokenizerWrapper,
