@@ -5,6 +5,7 @@ from openprompt import PromptForClassification
 from openprompt.plms import load_plm
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from torch.optim import AdamW
+from tqdm import tqdm
 from utils import seed_everything
 
 from prompt_tuning.dataset import PromptDataModule
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     for epoch in range(epochs):
         total_loss = 0
         prompt_model.train()
-        for step, inputs in enumerate(train_data_loader):
+        for step, inputs in enumerate(tqdm(train_data_loader)):
             loss = get_loss(inputs, prompt_model, criterion)
             loss.backward()
             total_loss += loss.item()
@@ -110,7 +111,7 @@ if __name__ == "__main__":
         print("validation check start")
         validation_loss = 0
         prompt_model.eval()
-        for _, inputs in enumerate(val_data_loader):
+        for inputs in tqdm(val_data_loader):
             loss = get_loss(inputs, prompt_model, criterion)
             validation_loss += loss.item()
 
@@ -118,7 +119,7 @@ if __name__ == "__main__":
 
     # final testing
     test_loss = 0
-    for _, inputs in enumerate(test_data_loader):  # Todo: inputs부터 loss까지 모듈화하기
+    for inputs in tqdm(test_data_loader):  # Todo: inputs부터 loss까지 모듈화하기
         loss = get_loss(inputs, prompt_model, criterion)
         test_loss += loss.item()
 
