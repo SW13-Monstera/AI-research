@@ -110,7 +110,7 @@ if __name__ == "__main__":
         print("validation check start")
         validation_loss = 0
         prompt_model.eval()
-        for step, inputs in enumerate(val_data_loader):
+        for _, inputs in enumerate(val_data_loader):
             loss = get_loss(inputs, prompt_model, criterion)
             validation_loss += loss.item()
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
     # final testing
     test_loss = 0
-    for step, inputs in enumerate(test_data_loader):  # Todo: inputs부터 loss까지 모듈화하기
+    for _, inputs in enumerate(test_data_loader):  # Todo: inputs부터 loss까지 모듈화하기
         loss = get_loss(inputs, prompt_model, criterion)
         test_loss += loss.item()
 
