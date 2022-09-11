@@ -1,4 +1,5 @@
 import random
+from collections import defaultdict
 from typing import Tuple
 
 from openprompt import PromptDataLoader
@@ -36,7 +37,7 @@ class PromptDataModule:
         self.prompt_input_dataset = self._convert_to_prompt_input_dataset(split_rate)
 
     def _convert_to_prompt_input_dataset(self, split_rate: tuple) -> dict:
-        prompt_input_dataset = {"train": [], "val": [], "test": []}
+        prompt_input_dataset = defaultdict(list)
         every_dataset = list(self.dataset["train"]) + list(self.dataset["validation"])
 
         if self.shuffle:
