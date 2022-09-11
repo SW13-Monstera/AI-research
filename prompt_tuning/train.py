@@ -1,5 +1,3 @@
-import logging
-
 import hydra
 import pyrootutils
 import torch
@@ -10,7 +8,7 @@ from openprompt.plms import load_plm
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from torch.optim import AdamW
 from tqdm import tqdm
-from utils import print_result, seed_everything
+from utils import log, print_result, seed_everything
 
 root = pyrootutils.setup_root(
     search_from=__file__,
@@ -18,9 +16,6 @@ root = pyrootutils.setup_root(
     pythonpath=True,
     dotenv=True,
 )
-
-log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
 
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
@@ -79,18 +74,26 @@ def main(cfg: DictConfig):
             optimizer.step()
             optimizer.zero_grad()
             if step % cfg.logging_steps == 0:
+                print_result(
+                    test_type="train",
+                    epoch=epoch,
+                    step=step,
+                    loss=total_loss,
+                    accuracy_score=total_acc,
+                    f1_score=total_f1,
+                )
                 print_result("train", epoch, step, total_loss, total_acc, total_f1)
             torch.cuda.empty_cache()
 
         val_loss = val_acc = val_f1 = 0
         prompt_model.eval()
-        for step, inputs in enumerate(val_data_loader):
+        for inputs in tqdm(val_data_loader):
             with torch.no_grad:
                 loss, acc, f1 = evaluation(inputs, prompt_model, criterion)
                 val_loss += loss.item()
                 val_acc += acc
                 val_f1 += f1
-        print_result("val", 0, len(val_data_loader), val_loss, val_acc, val_f1)
+        print_result(test_type="val", step=len(val_data_loader), loss=val_loss, accuracy_score=val_acc, f1_score=val_f1)
         torch.cuda.empty_cache()
 
     # final testing
@@ -101,8 +104,9 @@ def main(cfg: DictConfig):
             test_loss += loss.item()
             test_acc += acc
             test_f1 += f1
-
-    print_result("test", 0, len(test_data_loader), test_loss, test_acc, test_f1)
+    print_result(
+        test_type="test", step=len(test_data_loader), loss=test_loss, accuracy_score=test_acc, f1_score=test_f1
+    )
 
 
 if __name__ == "__main__":
