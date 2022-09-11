@@ -84,7 +84,7 @@ def main(cfg: DictConfig):
 
         val_loss = val_acc = val_f1 = 0
         prompt_model.eval()
-        for step, inputs in enumerate(val_data_loader):
+        for inputs in tqmd(val_data_loader):
             with torch.no_grad:
                 loss, acc, f1 = evaluation(inputs, prompt_model, criterion)
                 val_loss += loss.item()
