@@ -1,7 +1,11 @@
+import logging
 import random
 
 import numpy as np
 import torch
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 
 def seed_everything(seed):
@@ -15,7 +19,7 @@ def seed_everything(seed):
 
 
 def print_result(test_type: str, epoch: int, step: int, loss: float, accuracy_score: float, f1_score: float) -> None:
-    print(
+    log.info(
         f"[{test_type}] "
         f"Epoch {epoch} "
         f"val loss: {loss / step} "

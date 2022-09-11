@@ -1,3 +1,5 @@
+import logging
+
 import hydra
 import pyrootutils
 import torch
@@ -17,18 +19,22 @@ root = pyrootutils.setup_root(
     dotenv=True,
 )
 
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
 def main(cfg: DictConfig):
     seed_everything(cfg.seed)
+    log.info(cfg)
     plm, tokenizer, model_config, WrapperClass = load_plm(model_name=cfg.model.name, model_path=cfg.model.path)
     data_module = hydra.utils.instantiate(cfg.dataset)
 
     special_tokens = ["</s>", "<unk>", "<pad>"]
     special_tokens_dict = {"additional_special_tokens": special_tokens}
     num_added_tokens = tokenizer.add_special_tokens(special_tokens_dict)
-    print(f"{num_added_tokens}개의 special token 생성")
-    print(special_tokens)
+    log.info(f"{num_added_tokens}개의 special token 생성")
+    log.info(f"new special_token : {special_tokens}")
 
     template_text = '{"placeholder":"text_a"} Question: {"placeholder":"text_b"}? Is it correct? {"mask"}.'
     template = ManualTemplate(tokenizer=tokenizer, text=template_text)
@@ -40,6 +46,7 @@ def main(cfg: DictConfig):
     verbalizer = ManualVerbalizer(tokenizer=tokenizer, num_classes=3, label_words=[["yes"], ["no"], ["maybe"]])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    log.info(f"running on : {device}")
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
     prompt_model.to(device)
 
