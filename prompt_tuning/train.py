@@ -1,13 +1,14 @@
+import hydra
 import pyrootutils
 import torch
-from loss import get_loss
+from loss import evaluation
+from omegaconf import DictConfig
 from openprompt import PromptForClassification
 from openprompt.plms import load_plm
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from torch.optim import AdamW
-from utils import seed_everything
-
-from prompt_tuning.dataset import PromptDataModule
+from tqdm import tqdm
+from utils import print_result, seed_everything
 
 root = pyrootutils.setup_root(
     search_from=__file__,
@@ -17,50 +18,12 @@ root = pyrootutils.setup_root(
 )
 
 
-if __name__ == "__main__":
-    #######################
-    # hydra로 관리 할 hyper parameter들
-    # data
-    seed = 42
-    task = "nli"
-    dataset_path = "klue"
-    dataset_name = "nli"
-    split_rate = (8, 1, 1)
-    seed_everything(seed)
-    max_seq_length = 256
-    decoder_max_length = 3
-    batch_size = 4
-    teacher_forcing = False
-    predict_eos_token = False
-    truncate_method = "head"
+@hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
+def main(cfg: DictConfig):
+    seed_everything(cfg.seed)
+    plm, tokenizer, model_config, WrapperClass = load_plm(model_name=cfg.model.name, model_path=cfg.model.path)
+    data_module = hydra.utils.instantiate(cfg.dataset)
 
-    # model
-    model_name = "t5"
-    pretrain_model_path = "google/mt5-base"
-
-    # train
-    epochs = 10
-    lr = 1e-4
-    logging_steps = 100
-    weight_decay = 0.1
-
-    #########################
-    data_module = PromptDataModule(
-        dataset_path=dataset_path,
-        dataset_name=dataset_name,
-        seed=seed,
-        split_rate=split_rate,
-        max_seq_length=max_seq_length,
-        decoder_max_length=decoder_max_length,
-        batch_size=batch_size,
-        teacher_forcing=teacher_forcing,
-        predict_eos_token=predict_eos_token,
-        truncate_method=truncate_method,
-    )
-    plm, tokenizer, model_config, WrapperClass = load_plm(
-        model_name=model_name,
-        model_path=pretrain_model_path,
-    )
     special_tokens = ["</s>", "<unk>", "<pad>"]
     special_tokens_dict = {"additional_special_tokens": special_tokens}
     num_added_tokens = tokenizer.add_special_tokens(special_tokens_dict)
@@ -85,7 +48,7 @@ if __name__ == "__main__":
     optimizer_grouped_parameters = [
         {
             "params": [p for n, p in prompt_model.named_parameters() if not any(nd in n for nd in no_decay)],
-            "weight_decay": weight_decay,
+            "weight_decay": cfg.weight_decay,
         },
         {
             "params": [p for n, p in prompt_model.named_parameters() if any(nd in n for nd in no_decay)],
@@ -93,33 +56,47 @@ if __name__ == "__main__":
         },
     ]
 
-    optimizer = AdamW(optimizer_grouped_parameters, lr=lr)
+    optimizer = AdamW(optimizer_grouped_parameters, lr=cfg.lr)
 
-    for epoch in range(epochs):
-        total_loss = 0
+    for epoch in range(cfg.epochs):
+        total_loss = total_acc = total_f1 = 0
         prompt_model.train()
-        for step, inputs in enumerate(train_data_loader):
-            loss = get_loss(inputs, prompt_model, criterion)
+        for step, inputs in enumerate(tqdm(train_data_loader)):
+            loss, acc, f1 = evaluation(inputs, prompt_model, criterion)
+            del inputs
             loss.backward()
             total_loss += loss.item()
+            total_acc += acc
+            total_f1 += f1
+            del loss
             optimizer.step()
             optimizer.zero_grad()
-            if step % logging_steps == 0:
-                print(f"Epoch {epoch}, step: {step} average loss: {total_loss / (step + 1)}")
+            if step % cfg.logging_steps == 0:
+                print_result("train", epoch, step, total_loss, total_acc, total_f1)
+            torch.cuda.empty_cache()
 
-        print("validation check start")
-        validation_loss = 0
+        val_loss = val_acc = val_f1 = 0
         prompt_model.eval()
         for step, inputs in enumerate(val_data_loader):
-            loss = get_loss(inputs, prompt_model, criterion)
-            validation_loss += loss.item()
-
-        print(f"Epoch {epoch}, validation loss: {validation_loss / len(val_data_loader)}")
+            with torch.no_grad:
+                loss, acc, f1 = evaluation(inputs, prompt_model, criterion)
+                val_loss += loss.item()
+                val_acc += acc
+                val_f1 += f1
+        print_result("val", 0, len(val_data_loader), val_loss, val_acc, val_f1)
+        torch.cuda.empty_cache()
 
     # final testing
-    test_loss = 0
-    for step, inputs in enumerate(test_data_loader):  # Todo: inputs부터 loss까지 모듈화하기
-        loss = get_loss(inputs, prompt_model, criterion)
-        test_loss += loss.item()
+    test_loss = test_acc = test_f1 = 0
+    for inputs in tqdm(test_data_loader):  # Todo: inputs부터 loss까지 모듈화하기
+        with torch.no_grad():
+            loss, acc, f1 = evaluation(inputs, prompt_model, criterion)
+            test_loss += loss.item()
+            test_acc += acc
+            test_f1 += f1
 
-    print(f"Final test loss: {test_loss / len(test_data_loader)}")
+    print_result("test", 0, len(test_data_loader), test_loss, test_acc, test_f1)
+
+
+if __name__ == "__main__":
+    main()
