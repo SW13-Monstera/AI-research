@@ -1,7 +1,12 @@
+import logging
 import random
+from typing import Optional
 
 import numpy as np
 import torch
+
+log = logging.getLogger("__main__")
+log.setLevel(logging.INFO)
 
 
 def seed_everything(seed):
@@ -12,3 +17,15 @@ def seed_everything(seed):
     torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
+
+
+def print_result(
+    test_type: str, step: int, loss: float, accuracy_score: float, f1_score: float, epoch: Optional[int] = None
+) -> None:
+    log.info(
+        f"[{test_type}] ",
+        f"Epoch {epoch} " if epoch is None else "",
+        f"{test_type} loss: {loss / step} ",
+        f"accuracy: {accuracy_score / step} ",
+        f"f1_score: {f1_score / step}",
+    )
