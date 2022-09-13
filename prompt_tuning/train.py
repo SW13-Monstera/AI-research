@@ -3,7 +3,7 @@ import pyrootutils
 import torch
 from loss import evaluation
 from omegaconf import DictConfig
-from openprompt import PromptForClassification
+from openprompt import PromptDataLoader, PromptForClassification
 from openprompt.plms import load_plm
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from torch.optim import AdamW
@@ -18,6 +18,65 @@ root = pyrootutils.setup_root(
     pythonpath=True,
     dotenv=True,
 )
+
+
+def train(
+    epochs: int,
+    model: PromptForClassification,
+    train_data_loader: PromptDataLoader,
+    val_data_loader: PromptDataLoader,
+    criterion: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    logging_steps: int,
+) -> None:
+    for epoch in range(epochs):
+        total_loss = total_acc = total_f1 = 0
+        model.train()
+        for step, inputs in enumerate(tqdm(train_data_loader)):
+            loss, acc, f1 = evaluation(inputs, model, criterion)
+            del inputs
+            loss.backward()
+            total_loss += loss.item()
+            total_acc += acc
+            total_f1 += f1
+            del loss
+            optimizer.step()
+            optimizer.zero_grad()
+            if step % logging_steps == 1:
+                print_result(
+                    test_type="train",
+                    epoch=epoch,
+                    step=step,
+                    loss=total_loss,
+                    accuracy_score=total_acc,
+                    f1_score=total_f1,
+                )
+                print_result("train", epoch, step, total_loss, total_acc, total_f1)
+            torch.cuda.empty_cache()
+
+        val_loss = val_acc = val_f1 = 0
+        model.eval()
+        for inputs in tqdm(val_data_loader):
+            with torch.no_grad:
+                loss, acc, f1 = evaluation(inputs, model, criterion)
+                val_loss += loss.item()
+                val_acc += acc
+                val_f1 += f1
+        print_result(test_type="val", step=len(val_data_loader), loss=val_loss, accuracy_score=val_acc, f1_score=val_f1)
+        torch.cuda.empty_cache()
+
+
+def test(model: PromptForClassification, test_data_loader: PromptDataLoader, criterion: torch.nn.Module) -> None:
+    test_loss = test_acc = test_f1 = 0
+    for inputs in tqdm(test_data_loader):  # Todo: inputs부터 loss까지 모듈화하기
+        with torch.no_grad():
+            loss, acc, f1 = evaluation(inputs, model, criterion)
+            test_loss += loss.item()
+            test_acc += acc
+            test_f1 += f1
+    print_result(
+        test_type="test", step=len(test_data_loader), loss=test_loss, accuracy_score=test_acc, f1_score=test_f1
+    )
 
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
@@ -68,54 +127,17 @@ def main(cfg: DictConfig):
     ]
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=cfg.lr)
-
-    for epoch in range(cfg.epochs):
-        total_loss = total_acc = total_f1 = 0
-        prompt_model.train()
-        for step, inputs in enumerate(tqdm(train_data_loader)):
-            loss, acc, f1 = evaluation(inputs, prompt_model, criterion)
-            del inputs
-            loss.backward()
-            total_loss += loss.item()
-            total_acc += acc
-            total_f1 += f1
-            del loss
-            optimizer.step()
-            optimizer.zero_grad()
-            if step % cfg.logging_steps == 0:
-                print_result(
-                    test_type="train",
-                    epoch=epoch,
-                    step=step,
-                    loss=total_loss,
-                    accuracy_score=total_acc,
-                    f1_score=total_f1,
-                )
-                print_result("train", epoch, step, total_loss, total_acc, total_f1)
-            torch.cuda.empty_cache()
-
-        val_loss = val_acc = val_f1 = 0
-        prompt_model.eval()
-        for inputs in tqdm(val_data_loader):
-            with torch.no_grad:
-                loss, acc, f1 = evaluation(inputs, prompt_model, criterion)
-                val_loss += loss.item()
-                val_acc += acc
-                val_f1 += f1
-        print_result(test_type="val", step=len(val_data_loader), loss=val_loss, accuracy_score=val_acc, f1_score=val_f1)
-        torch.cuda.empty_cache()
-
-    # final testing
-    test_loss = test_acc = test_f1 = 0
-    for inputs in tqdm(test_data_loader):  # Todo: inputs부터 loss까지 모듈화하기
-        with torch.no_grad():
-            loss, acc, f1 = evaluation(inputs, prompt_model, criterion)
-            test_loss += loss.item()
-            test_acc += acc
-            test_f1 += f1
-    print_result(
-        test_type="test", step=len(test_data_loader), loss=test_loss, accuracy_score=test_acc, f1_score=test_f1
+    train(
+        epochs=cfg.epochs,
+        model=prompt_model,
+        train_data_loader=train_data_loader,
+        val_data_loader=val_data_loader,
+        criterion=criterion,
+        optimizer=optimizer,
+        logging_steps=cfg.logging_steps,
     )
+
+    test(model=prompt_model, test_data_loader=test_data_loader, criterion=criterion)
 
 
 if __name__ == "__main__":
