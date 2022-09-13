@@ -10,7 +10,11 @@ from torch.optim import AdamW
 from tqdm import tqdm
 from utils import log, print_result, seed_everything
 
-from prompt_tuning.dataset import PromptLoader, PromptNliDataModule
+from prompt_tuning.dataset import (
+    PromptLabeledDataModule,
+    PromptLoader,
+    PromptNliDataModule,
+)
 
 root = pyrootutils.setup_root(
     search_from=__file__,
@@ -80,7 +84,8 @@ def test(model: PromptForClassification, test_data_loader: PromptDataLoader, cri
 
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
-def main(cfg: DictConfig):
+def main(cfg: DictConfig) -> None:
+
     seed_everything(cfg.seed)
     log.info(cfg)
     plm, tokenizer, model_config, WrapperClass = load_plm(model_name=cfg.model.name, model_path=cfg.model.path)
@@ -105,8 +110,7 @@ def main(cfg: DictConfig):
         )
         for data_type in ["train", "val", "test"]
     ]
-
-    verbalizer = ManualVerbalizer(tokenizer=tokenizer, num_classes=3, label_words=[["yes"], ["no"], ["maybe"]])
+    verbalizer = ManualVerbalizer(tokenizer=tokenizer, num_classes=2, label_words=[["yes"], ["no"]])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"running on : {device}")
@@ -127,6 +131,29 @@ def main(cfg: DictConfig):
     ]
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=cfg.lr)
+    train(
+        epochs=cfg.epochs,
+        model=prompt_model,
+        train_data_loader=train_data_loader,
+        val_data_loader=val_data_loader,
+        criterion=criterion,
+        optimizer=optimizer,
+        logging_steps=cfg.logging_steps,
+    )
+
+    test(model=prompt_model, test_data_loader=test_data_loader, criterion=criterion)
+
+    labeled_data_module: PromptLabeledDataModule = hydra.utils.instantiate(cfg.dataset.labeled)
+    train_data_loader, val_data_loader, test_data_loader = [
+        prompt_loader.get_loader(
+            dataset=labeled_data_module.prompt_input_dataset[data_type],
+            template=template,
+            tokenizer=tokenizer,
+            tokenizer_wrapper_class=WrapperClass,
+        )
+        for data_type in ["train", "val", "test"]
+    ]
+
     train(
         epochs=cfg.epochs,
         model=prompt_model,

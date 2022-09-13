@@ -1,3 +1,5 @@
 root_dir: ${oc.env:PROJECT_ROOT}
 
 data_dir: ${paths.root_dir}/static/
+
+ckpt_dir: ${paths.root_dir}/ckpt/

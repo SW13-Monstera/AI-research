@@ -72,8 +72,26 @@ class PromptNliDataModule:
         self.dataset = load_dataset(dataset_path, dataset_name)
         self.prompt_input_dataset = self._convert_to_prompt_input_dataset(split_rate)
 
+    def _get_preprocessed_dataset(self) -> List:
+        """
+        [before] 0: entailment, 1: neutral, 2: contradiction
+        우리의 task에 맞게 변형하려면 neutral을 삭제하고 entailment과 contradiction를 swap해야 한다.
+        [after] 0: contradiction, 1: entailment
+        """
+        new_dataset = []
+        for data_type in ["train", "validation"]:
+            for data in self.dataset[data_type]:
+                if data["label"] == 1:
+                    continue
+                elif data["label"] == 2:
+                    data["label"] = 0
+                elif data["label"] == 0:
+                    data["label"] = 1
+                new_dataset.append(data)
+        return new_dataset
+
     def _convert_to_prompt_input_dataset(self, split_rate: tuple) -> Dict:
-        every_dataset = list(self.dataset["train"]) + list(self.dataset["validation"])
+        every_dataset = self._get_preprocessed_dataset()
 
         if self.shuffle:
             random.seed(self.seed)
@@ -115,7 +133,7 @@ class PromptLabeledDataModule:
         self.seed = seed
         self.shuffle = shuffle
         self.dataset = self._load_labeled_dataset(dataset_path)
-        self.prompt_input_dataset = self._split_dataset(split_rate)
+        self.prompt_input_dataset = self._convert_to_prompt_input_dataset(split_rate)
 
     @staticmethod
     def _load_labeled_dataset(csv_path: str = "../static/labeled_dataset.csv") -> List[RequiredGradingData]:
@@ -149,7 +167,7 @@ class PromptLabeledDataModule:
                 dataset.append(data)
         return dataset
 
-    def _split_dataset(self, split_rate: Tuple = (8, 1, 1)) -> Dict:
+    def _convert_to_prompt_input_dataset(self, split_rate: Tuple = (8, 1, 1)) -> Dict:
         answer_id_list = list(set((data.answer_id for data in self.dataset)))
         if self.shuffle:
             random.seed(self.seed)
@@ -168,12 +186,19 @@ class PromptLabeledDataModule:
         train_dataset, val_dataset, test_dataset = [], [], []
 
         for data in self.dataset:
+            input_example = InputExample(
+                text_a=data.premise,
+                text_b=data.hypothesis,
+                label=data.label,
+                guid=data.guid,
+            )
+
             if data.answer_id in train_answer_id_set:
-                train_dataset.append(data)
+                train_dataset.append(input_example)
             elif data.answer_id in val_answer_id_set:
-                val_dataset.append(data)
+                val_dataset.append(input_example)
             elif data.answer_id in test_answer_id_set:
-                test_dataset.append(data)
+                test_dataset.append(input_example)
             else:
                 assert f"split error: dataset split 도중 에러가 발생하였습니다. {__file__}을 확인해주세요"
 
