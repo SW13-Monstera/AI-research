@@ -14,7 +14,7 @@ from prompt_tuning.utils import log
 
 
 class RequiredGradingData(BaseModel):
-    problem_id: str
+    problem_id: str  # Todo: 나중에 int로 바꾸기
     answer_id: int
     guid: str
     source: str
@@ -138,7 +138,7 @@ class PromptLabeledDataModule:
             for i, criterion in enumerate(row_data.scoring_criterion):
                 data = RequiredGradingData(
                     problem_id=row_data.problem_id,
-                    answer_id=row_data.Index if isinstance(row_data.Index, str) else str(row_data.Index),
+                    answer_id=row_data.Index,
                     guid=f"{row_data.Index}-{i}",
                     source="CS-broker",
                     premise=row_data.user_answer,
