@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from transformers import PreTrainedTokenizer
 
 from datasets import load_dataset
+from prompt_tuning.utils import log
 
 
 class RequiredGradingData(BaseModel):
@@ -107,13 +108,13 @@ class PromptDataModule:
 
 def load_labeled_dataset(csv_path: str = "../static/labeled_dataset.csv") -> List[RequiredGradingData]:
     df = pd.read_csv(csv_path)
-    print(f"pre data size : {len(df)}")
+    log.info(f"previous data size : {len(df)}")
     df["user_answer"] = df["user_answer"].apply(
         lambda x: x.strip().replace("\n", "").replace("\xa0", "").replace("  ", " ")
     )
     df["user_answer"].replace("", np.nan, inplace=True)
     df.dropna(axis=0, subset=["user_answer"], inplace=True)  # 빈 답변 제거
-    print(f"after data size : {len(df)}")
+    log.info(f"after data size : {len(df)}")
 
     if isinstance(df["correct_scoring_criterion"][0], str):  # list를 string으로 표현된 경우 type casting
         df["correct_scoring_criterion"] = df["correct_scoring_criterion"].apply(eval)
