@@ -10,6 +10,8 @@ from torch.optim import AdamW
 from tqdm import tqdm
 from utils import log, print_result, seed_everything
 
+from prompt_tuning.dataset import PromptLoader, PromptNliDataModule
+
 root = pyrootutils.setup_root(
     search_from=__file__,
     indicator=[".git"],
@@ -23,7 +25,7 @@ def main(cfg: DictConfig):
     seed_everything(cfg.seed)
     log.info(cfg)
     plm, tokenizer, model_config, WrapperClass = load_plm(model_name=cfg.model.name, model_path=cfg.model.path)
-    data_module = hydra.utils.instantiate(cfg.dataset)
+    nli_data_module: PromptNliDataModule = hydra.utils.instantiate(cfg.dataset.nli)
 
     special_tokens = ["</s>", "<unk>", "<pad>"]
     special_tokens_dict = {"additional_special_tokens": special_tokens}
@@ -34,9 +36,16 @@ def main(cfg: DictConfig):
     template_text = '{"placeholder":"text_a"} Question: {"placeholder":"text_b"}? Is it correct? {"mask"}.'
     template = ManualTemplate(tokenizer=tokenizer, text=template_text)
 
-    train_data_loader, val_data_loader, test_data_loader = data_module.get_data_loader(
-        template=template, tokenizer=tokenizer, tokenizer_wrapper_class=WrapperClass
-    )
+    prompt_loader: PromptLoader = hydra.utils.instantiate(cfg.dataset.loader)
+    train_data_loader, val_data_loader, test_data_loader = [
+        prompt_loader.get_loader(
+            dataset=nli_data_module.prompt_input_dataset[data_type],
+            template=template,
+            tokenizer=tokenizer,
+            tokenizer_wrapper_class=WrapperClass,
+        )
+        for data_type in ["train", "val", "test"]
+    ]
 
     verbalizer = ManualVerbalizer(tokenizer=tokenizer, num_classes=3, label_words=[["yes"], ["no"], ["maybe"]])
 
