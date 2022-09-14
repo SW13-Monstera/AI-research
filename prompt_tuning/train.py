@@ -59,6 +59,7 @@ def train(
             torch.cuda.empty_cache()
 
         val_loss = val_acc = val_f1 = 0
+
         model.eval()
         with torch.no_grad():
             for inputs in tqdm(val_data_loader):
