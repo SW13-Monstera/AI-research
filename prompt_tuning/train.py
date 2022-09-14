@@ -33,6 +33,7 @@ def train(
     optimizer: torch.optim.Optimizer,
     logging_steps: int,
 ) -> None:
+    best_acc = 0
     for epoch in range(epochs):
         total_loss = total_acc = total_f1 = 0
         model.train()
@@ -55,25 +56,29 @@ def train(
                     accuracy_score=total_acc,
                     f1_score=total_f1,
                 )
-                print_result("train", epoch, step, total_loss, total_acc, total_f1)
             torch.cuda.empty_cache()
 
         val_loss = val_acc = val_f1 = 0
         model.eval()
-        for inputs in tqdm(val_data_loader):
-            with torch.no_grad:
+        with torch.no_grad():
+            for inputs in tqdm(val_data_loader):
                 loss, acc, f1 = evaluation(inputs, model, criterion)
                 val_loss += loss.item()
                 val_acc += acc
                 val_f1 += f1
+
+        # val_acc /= len(val_data_loader)
+        if best_acc < val_acc:
+            best_acc = val_acc
+            torch.save(model.state_dict(), "./jw-mt5-base.bin")
         print_result(test_type="val", step=len(val_data_loader), loss=val_loss, accuracy_score=val_acc, f1_score=val_f1)
         torch.cuda.empty_cache()
 
 
 def test(model: PromptForClassification, test_data_loader: PromptDataLoader, criterion: torch.nn.Module) -> None:
     test_loss = test_acc = test_f1 = 0
-    for inputs in tqdm(test_data_loader):  # Todo: inputs부터 loss까지 모듈화하기
-        with torch.no_grad():
+    with torch.no_grad():
+        for inputs in tqdm(test_data_loader):
             loss, acc, f1 = evaluation(inputs, model, criterion)
             test_loss += loss.item()
             test_acc += acc
@@ -116,11 +121,12 @@ def main(cfg: DictConfig) -> None:
     log.info(f"running on : {device}")
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
     prompt_model.to(device)
-
+    prompt_model.load_state_dict(torch.load('./jw-mt5-base.bin'))
     criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
+
             "params": [p for n, p in prompt_model.named_parameters() if not any(nd in n for nd in no_decay)],
             "weight_decay": cfg.weight_decay,
         },
