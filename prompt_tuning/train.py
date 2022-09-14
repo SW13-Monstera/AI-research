@@ -67,7 +67,6 @@ def train(
                 val_acc += acc
                 val_f1 += f1
 
-        # val_acc /= len(val_data_loader)
         if best_acc < val_acc:
             best_acc = val_acc
             torch.save(model.state_dict(), "./jw-mt5-base.bin")
