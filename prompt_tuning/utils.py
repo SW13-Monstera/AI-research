@@ -24,9 +24,11 @@ def print_result(
 ) -> None:
     if step != 0:
         log.info(
-            f"[{test_type}] "
-            + f"Epoch {epoch if epoch is not None else ''} "
-            + f"{test_type} loss: {loss / step} "
-            + f"accuracy: {accuracy_score / step} "
-            + f"f1_score: {f1_score / step}"
+            (
+                f"[{test_type}] "
+                f"Epoch {epoch if epoch is not None else ''} "
+                f"{test_type} loss: {loss / step} "
+                f"accuracy: {accuracy_score / step} "
+                f"f1_score: {f1_score / step}"
+            )
         )
