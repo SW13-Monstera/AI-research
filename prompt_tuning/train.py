@@ -59,7 +59,6 @@ def train(
             torch.cuda.empty_cache()
 
         val_loss = val_acc = val_f1 = 0
-
         model.eval()
         with torch.no_grad():
             for inputs in tqdm(val_data_loader):
@@ -121,12 +120,11 @@ def main(cfg: DictConfig) -> None:
     log.info(f"running on : {device}")
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
     prompt_model.to(device)
-    prompt_model.load_state_dict(torch.load('./jw-mt5-base.bin'))
+    prompt_model.load_state_dict(torch.load("./jw-mt5-base.bin"))
     criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
-
             "params": [p for n, p in prompt_model.named_parameters() if not any(nd in n for nd in no_decay)],
             "weight_decay": cfg.weight_decay,
         },
