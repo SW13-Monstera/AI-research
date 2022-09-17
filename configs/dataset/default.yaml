@@ -3,7 +3,7 @@ nli:
   seed: 42
   dataset_path: klue
   dataset_name: nli
-  split_rate: [8, 1, 1]
+  test_rate: 0.2
   shuffle: False
 
 
@@ -11,7 +11,7 @@ labeled:
   _target_: prompt_tuning.dataset.PromptLabeledDataModule
   seed: 42
   dataset_path: ${oc.env:PROJECT_ROOT}/static/labeled_dataset.csv
-  split_rate: [8, 1, 1]
+  test_rate: 0.2
   shuffle: True
 
 

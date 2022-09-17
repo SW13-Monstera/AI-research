@@ -47,7 +47,7 @@ lr: 0.0001
 logging_steps: 100
 weight_decay: 0.1
 
-upload_model_to_s3: True
+upload_model_to_s3: False
 s3_bucket: cs-broker-bucket
 
 huggingface_repo: ekzm8523/cs-boker-mt5-base

@@ -122,14 +122,14 @@ def main(cfg: DictConfig) -> None:
     template = ManualTemplate(tokenizer=tokenizer, text=template_text)
 
     prompt_loader: PromptLoader = hydra.utils.instantiate(cfg.dataset.loader)
-    train_data_loader, val_data_loader, test_data_loader = [
+    train_data_loader, val_data_loader = [
         prompt_loader.get_loader(
             dataset=nli_data_module.prompt_input_dataset[data_type],
             template=template,
             tokenizer=tokenizer,
             tokenizer_wrapper_class=WrapperClass,
         )
-        for data_type in ["train", "val", "test"]
+        for data_type in ["train", "val"]
     ]
     verbalizer = ManualVerbalizer(tokenizer=tokenizer, num_classes=2, label_words=[["yes"], ["no"]])
 
@@ -162,17 +162,15 @@ def main(cfg: DictConfig) -> None:
         logging_steps=cfg.logging_steps,
     )
 
-    test(model=prompt_model, test_data_loader=test_data_loader, criterion=criterion)
-
     labeled_data_module: PromptLabeledDataModule = hydra.utils.instantiate(cfg.dataset.labeled)
-    train_data_loader, val_data_loader, test_data_loader = [
+    train_data_loader, val_data_loader = [
         prompt_loader.get_loader(
             dataset=labeled_data_module.prompt_input_dataset[data_type],
             template=template,
             tokenizer=tokenizer,
             tokenizer_wrapper_class=WrapperClass,
         )
-        for data_type in ["train", "val", "test"]
+        for data_type in ["train", "val"]
     ]
 
     train(
@@ -184,8 +182,6 @@ def main(cfg: DictConfig) -> None:
         optimizer=optimizer,
         logging_steps=cfg.logging_steps,
     )
-
-    test(model=prompt_model, test_data_loader=test_data_loader, criterion=criterion)
 
     if cfg.upload_model_to_s3:
         date_folder = sorted(os.listdir("./outputs"))[-1]

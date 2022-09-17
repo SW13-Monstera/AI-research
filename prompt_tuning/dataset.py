@@ -1,5 +1,5 @@
 import random
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -64,13 +64,13 @@ class PromptNliDataModule:
         dataset_path: str = "klue",
         dataset_name: str = "nli",
         seed: int = 42,
-        split_rate: Tuple = (8, 1, 1),  # train, val, test
+        test_rate: float = 0.2,  # train, val
         shuffle: bool = False,
     ) -> None:
         self.seed = seed
         self.shuffle = shuffle
         self.dataset = load_dataset(dataset_path, dataset_name)
-        self.prompt_input_dataset = self._convert_to_prompt_input_dataset(split_rate)
+        self.prompt_input_dataset = self._convert_to_prompt_input_dataset(test_rate)
 
     def _get_preprocessed_dataset(self) -> List:
         """
@@ -90,20 +90,16 @@ class PromptNliDataModule:
                 new_dataset.append(data)
         return new_dataset
 
-    def _convert_to_prompt_input_dataset(self, split_rate: tuple) -> Dict:
+    def _convert_to_prompt_input_dataset(self, test_rate: float) -> Dict:
         every_dataset = self._get_preprocessed_dataset()
 
         if self.shuffle:
             random.seed(self.seed)
             random.shuffle(every_dataset)
 
-        split_rate_sum = sum(split_rate)
-        train_rate = split_rate[0] / split_rate_sum
-        val_rate = split_rate[1] / split_rate_sum
-        start_val_idx = int(train_rate * len(every_dataset))
-        start_test_idx = int((train_rate + val_rate) * len(every_dataset))
+        start_val_idx = int((1 - test_rate) * len(every_dataset))
 
-        train_dataset, val_dataset, test_dataset = [], [], []
+        train_dataset, val_dataset = [], []
         for i, data in enumerate(every_dataset):
             input_example = InputExample(
                 text_a=data["premise"],
@@ -114,26 +110,18 @@ class PromptNliDataModule:
 
             if i < start_val_idx:
                 train_dataset.append(input_example)
-            elif i < start_test_idx:
-                val_dataset.append(input_example)
             else:
-                test_dataset.append(input_example)
+                val_dataset.append(input_example)
 
-        return {"train": train_dataset, "val": val_dataset, "test": test_dataset}
+        return {"train": train_dataset, "val": val_dataset}
 
 
 class PromptLabeledDataModule:
-    def __init__(
-        self,
-        dataset_path: str,
-        seed: int = 42,
-        split_rate: Tuple = (8, 1, 1),  # train, val, test
-        shuffle: bool = False,
-    ) -> None:
+    def __init__(self, dataset_path: str, seed: int = 42, test_rate: float = 0.2, shuffle: bool = False) -> None:
         self.seed = seed
         self.shuffle = shuffle
         self.dataset = self._load_labeled_dataset(dataset_path)
-        self.prompt_input_dataset = self._convert_to_prompt_input_dataset(split_rate)
+        self.prompt_input_dataset = self._convert_to_prompt_input_dataset(test_rate)
 
     @staticmethod
     def _load_labeled_dataset(csv_path: str = "../static/labeled_dataset.csv") -> List[RequiredGradingData]:
@@ -167,24 +155,16 @@ class PromptLabeledDataModule:
                 dataset.append(data)
         return dataset
 
-    def _convert_to_prompt_input_dataset(self, split_rate: Tuple = (8, 1, 1)) -> Dict:
+    def _convert_to_prompt_input_dataset(self, test_size: float = 0.2) -> Dict:
         answer_id_list = list(set((data.answer_id for data in self.dataset)))
         if self.shuffle:
             random.seed(self.seed)
             random.shuffle(answer_id_list)
-        split_rate_total = sum(split_rate)
-        start_val_idx = int(split_rate[0] / split_rate_total * len(answer_id_list))
-        start_test_idx = start_val_idx + int(split_rate[1] / split_rate_total * len(answer_id_list))
-        train_answer_id_set = set(answer_id_list[:start_val_idx])
-        val_answer_id_set = set(answer_id_list[start_val_idx:start_test_idx])
-        test_answer_id_set = set(answer_id_list[start_test_idx:])
 
-        assert len(train_answer_id_set) + len(val_answer_id_set) + len(test_answer_id_set) == len(
-            answer_id_list
-        ), f"dataset split error: split된 데이터와 전체 데이터의 갯수가 맞지 않습니다. {__file__}을 확인해주세요"
+        start_val_idx = int((1 - test_size) * len(answer_id_list))
+        val_answer_id_set = set(answer_id_list[start_val_idx:])
 
-        train_dataset, val_dataset, test_dataset = [], [], []
-
+        train_dataset, val_dataset = [], []
         for data in self.dataset:
             input_example = InputExample(
                 text_a=data.premise,
@@ -193,13 +173,9 @@ class PromptLabeledDataModule:
                 guid=data.guid,
             )
 
-            if data.answer_id in train_answer_id_set:
-                train_dataset.append(input_example)
-            elif data.answer_id in val_answer_id_set:
+            if data.answer_id in val_answer_id_set:
                 val_dataset.append(input_example)
-            elif data.answer_id in test_answer_id_set:
-                test_dataset.append(input_example)
             else:
-                assert f"split error: dataset split 도중 에러가 발생하였습니다. {__file__}을 확인해주세요"
+                train_dataset.append(input_example)
 
-        return {"train": train_dataset, "val": val_dataset, "test": test_dataset}
+        return {"train": train_dataset, "val": val_dataset}
