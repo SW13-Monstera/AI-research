@@ -3,6 +3,7 @@ import os
 import hydra
 import pyrootutils
 import torch
+import wandb
 from loss import evaluation
 from omegaconf import DictConfig
 from openprompt import PromptDataLoader, PromptForClassification
@@ -36,6 +37,7 @@ def train(
     optimizer: torch.optim.Optimizer,
     logging_steps: int,
 ) -> None:
+    wandb.watch(model, criterion, log="all", log_freq=100)
     best_acc = 0
     for epoch in range(epochs):
         total_loss = total_acc = total_f1 = 0
@@ -92,6 +94,7 @@ def test(model: PromptForClassification, test_data_loader: PromptDataLoader, cri
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
 def main(cfg: DictConfig) -> None:
+    wandb.init(project="CS-broker", entity="ekzm8523", config=cfg)
     seed_everything(cfg.seed)
     log.info(cfg)
 

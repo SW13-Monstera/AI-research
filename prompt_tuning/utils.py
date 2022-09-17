@@ -5,6 +5,7 @@ from typing import Optional
 
 import numpy as np
 import torch
+import wandb
 from openprompt import PromptForClassification
 
 from core.config import session
@@ -28,15 +29,15 @@ def print_result(
     test_type: str, step: int, loss: float, accuracy_score: float, f1_score: float, epoch: Optional[int] = None
 ) -> None:
     if step != 0:
-        log.info(
-            (
-                f"[{test_type}] "
-                f"Epoch {epoch if epoch is not None else ''} "
-                f"{test_type} loss: {loss / step} "
-                f"accuracy: {accuracy_score / step} "
-                f"f1_score: {f1_score / step}"
-            )
+        log_string = (
+            f"[{test_type}] "
+            f"Epoch {epoch if epoch is not None else ''} "
+            f"{test_type} loss: {loss / step} "
+            f"accuracy: {accuracy_score / step} "
+            f"f1_score: {f1_score / step}"
         )
+        log.info(log_string)
+        wandb.log(log_string)
 
 
 def upload_model_to_s3(
