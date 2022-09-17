@@ -9,3 +9,5 @@ pip3 install hydra-core
 pip3 install pyrootutils
 pip3 install scikit-learn
 pip3 install pydantic
+
+need huggingface login

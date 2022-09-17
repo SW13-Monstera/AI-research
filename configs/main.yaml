@@ -7,7 +7,6 @@ defaults:
   - dataset: default.yaml
   - model: mt5-base.yaml
   - paths: default.yaml
-
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
   - experiment: null
@@ -47,3 +46,8 @@ epochs: 5
 lr: 0.0001
 logging_steps: 100
 weight_decay: 0.1
+
+upload_model_to_s3: True
+s3_bucket: cs-broker-bucket
+
+huggingface_repo: ekzm8523/cs-boker-mt5-base

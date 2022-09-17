@@ -1,15 +1,18 @@
+import os
+
 import hydra
 import pyrootutils
 import torch
 from loss import evaluation
 from omegaconf import DictConfig
 from openprompt import PromptDataLoader, PromptForClassification
-from openprompt.plms import load_plm
+from openprompt.plms import get_model_class
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from torch.optim import AdamW
 from tqdm import tqdm
-from utils import log, print_result, seed_everything
+from utils import log, print_result, seed_everything, upload_model_to_s3
 
+from core.config import HUGGING_FACE_ACCESS_TOKEN
 from prompt_tuning.dataset import (
     PromptLabeledDataModule,
     PromptLoader,
@@ -89,17 +92,22 @@ def test(model: PromptForClassification, test_data_loader: PromptDataLoader, cri
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
 def main(cfg: DictConfig) -> None:
-
     seed_everything(cfg.seed)
     log.info(cfg)
-    plm, tokenizer, model_config, WrapperClass = load_plm(model_name=cfg.model.name, model_path=cfg.model.path)
-    nli_data_module: PromptNliDataModule = hydra.utils.instantiate(cfg.dataset.nli)
+
+    model_class = get_model_class(plm_type=cfg.model.name)
+    plm = model_class.model.from_pretrained(cfg.model.path, use_auth_token=HUGGING_FACE_ACCESS_TOKEN)
+    tokenizer = model_class.tokenizer.from_pretrained(cfg.model.path, use_auth_token=HUGGING_FACE_ACCESS_TOKEN)
 
     special_tokens = ["</s>", "<unk>", "<pad>"]
     special_tokens_dict = {"additional_special_tokens": special_tokens}
     num_added_tokens = tokenizer.add_special_tokens(special_tokens_dict)
     log.info(f"{num_added_tokens}개의 special token 생성")
     log.info(f"new special_token : {special_tokens}")
+
+    WrapperClass = model_class.wrapper
+
+    nli_data_module: PromptNliDataModule = hydra.utils.instantiate(cfg.dataset.nli)
 
     template_text = '{"placeholder":"text_a"} Question: {"placeholder":"text_b"}? Is it correct? {"mask"}.'
     template = ManualTemplate(tokenizer=tokenizer, text=template_text)
@@ -120,7 +128,7 @@ def main(cfg: DictConfig) -> None:
     log.info(f"running on : {device}")
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
     prompt_model.to(device)
-    prompt_model.load_state_dict(torch.load("./jw-mt5-base.bin"))
+    # prompt_model.load_state_dict(torch.load("./jw-mt5-base.bin"))
     criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
@@ -169,6 +177,17 @@ def main(cfg: DictConfig) -> None:
     )
 
     test(model=prompt_model, test_data_loader=test_data_loader, criterion=criterion)
+
+    if cfg.upload_model_to_s3:
+        date_folder = sorted(os.listdir("./outputs"))[-1]
+        time_folder = sorted(os.listdir(f"./outputs/{date_folder}"))[-1]
+        folder = os.path.join("ai-models", date_folder, time_folder)
+        upload_model_to_s3(
+            model=prompt_model,
+            bucket=cfg.s3_bucket,
+            folder=folder,
+            model_name="model.pth",
+        )
 
 
 if __name__ == "__main__":
