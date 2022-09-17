@@ -26,7 +26,13 @@ def seed_everything(seed):
 
 
 def print_result(
-    test_type: str, step: int, loss: float, accuracy_score: float, f1_score: float, epoch: Optional[int] = None
+    test_type: str,
+    step: int,
+    loss: float,
+    accuracy_score: float,
+    f1_score: float,
+    auc: float,
+    epoch: Optional[int] = None,
 ) -> None:
     if step != 0:
         log_string = (
@@ -35,6 +41,7 @@ def print_result(
             f"{test_type} loss: {loss / step} "
             f"accuracy: {accuracy_score / step} "
             f"f1_score: {f1_score / step}"
+            f"auc: {auc / step}"
         )
         log.info(log_string)
         wandb.log(log_string)
