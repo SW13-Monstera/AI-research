@@ -1,11 +1,10 @@
 import os
-from typing import Tuple
 
 import hydra
 import pyrootutils
 import torch
 import wandb
-from loss import evaluation
+from loss import EarlyStopping, calculate_metric, get_predicts
 from omegaconf import DictConfig
 from openprompt import PromptDataLoader, PromptForClassification
 from openprompt.plms import get_model_class
@@ -39,63 +38,61 @@ def train(
     logging_steps: int,
 ) -> None:
     wandb.watch(model, criterion, log="all", log_freq=100)
-    best_acc = 0
+    early_stopping = EarlyStopping(patience=3, verbose=True)
     for epoch in range(epochs):
-        total_loss = total_acc = total_f1 = total_auc = 0
+        total_loss = 0
         model.train()
         for step, inputs in enumerate(tqdm(train_data_loader)):
-            loss, acc, f1, auc = evaluation(inputs, model, criterion)
+            predicts = get_predicts(inputs, model)
+            labels = inputs.label.cpu().numpy()
+            loss = criterion(labels, predicts)
             loss.backward()
+            total_loss += loss.item()
+            del inputs, loss
+            optimizer.step()
+            optimizer.zero_grad()
+            if step % logging_steps == 1:
+                print_result(test_type="train", epoch=epoch, step=step, loss=total_loss)
+            torch.cuda.empty_cache()
+
+        test(model, val_data_loader, criterion, early_stopping)
+
+        if early_stopping.early_stop:
+            log.info("Early stopping")
+            break
+
+
+def test(
+    model: PromptForClassification,
+    test_data_loader: PromptDataLoader,
+    criterion: torch.nn.Module,
+    early_stopping: EarlyStopping,
+) -> None:
+    total_loss = total_acc = total_f1 = total_auc = 0
+
+    with torch.no_grad():
+        for inputs in tqdm(test_data_loader):
+            predicts = get_predicts(inputs, model)
+            labels = inputs.label.cpu().numpy()
+            loss = criterion(labels, predicts)
+            acc, f1, auc = calculate_metric(labels, predicts)
             total_loss += loss.item()
             total_acc += acc
             total_f1 += f1
             total_auc += auc
             del inputs, loss
-            optimizer.step()
-            optimizer.zero_grad()
-            if step % logging_steps == 1:
-                print_result(
-                    test_type="train",
-                    epoch=epoch,
-                    step=step,
-                    loss=total_loss,
-                    accuracy_score=total_acc,
-                    f1_score=total_f1,
-                    auc=total_auc,
-                )
-            torch.cuda.empty_cache()
+    avg_loss = total_loss / len(test_data_loader)
+    early_stopping(avg_loss, model)
 
-        val_loss, val_acc, val_f1, val_auc = test(model, val_data_loader, criterion, is_val=True)
-
-        if best_acc < val_acc:
-            best_acc = val_acc
-            torch.save(model.state_dict(), "./jw-mt5-base.bin")
-
-
-def test(
-    model: PromptForClassification, test_data_loader: PromptDataLoader, criterion: torch.nn.Module, is_val: bool
-) -> Tuple[float, float, float, float]:
-    test_loss = test_acc = test_f1 = test_auc = 0
-    with torch.no_grad():
-        for inputs in tqdm(test_data_loader):
-            loss, acc, f1, auc = evaluation(inputs, model, criterion)
-
-            test_loss += loss.item()
-            test_acc += acc
-            test_f1 += f1
-            test_auc += auc
-            del inputs, loss
     print_result(
-        test_type="val" if is_val else "test",
+        test_type="val",
         step=len(test_data_loader),
-        loss=test_loss,
-        accuracy_score=test_acc,
-        f1_score=test_f1,
-        auc=test_auc,
+        loss=total_loss,
+        accuracy_score=total_acc,
+        f1_score=total_f1,
+        auc=total_auc,
     )
-    size = len(test_data_loader)
     torch.cuda.empty_cache()
-    return test_loss / size, test_acc / size, test_f1 / size, test_auc / size
 
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")

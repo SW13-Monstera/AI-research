@@ -29,19 +29,22 @@ def print_result(
     test_type: str,
     step: int,
     loss: float,
-    accuracy_score: float,
-    f1_score: float,
-    auc: float,
+    accuracy_score: Optional[float] = None,
+    f1_score: Optional[float] = None,
+    auc: Optional[float] = None,
     epoch: Optional[int] = None,
 ) -> None:
     if step != 0:
         log_string = (
-            f"[{test_type}] "
-            f"Epoch {epoch if epoch is not None else ''} "
-            f"{test_type} loss: {loss / step} "
-            f"accuracy: {accuracy_score / step} "
-            f"f1_score: {f1_score / step}"
-            f"auc: {auc / step}"
+            f"[{test_type}] " f"Epoch {epoch} "
+            if epoch is not None
+            else "" f"{test_type} loss: {loss / step} " f"accuracy: {accuracy_score / step} "
+            if accuracy_score is not None
+            else "" f"f1_score: {f1_score / step}"
+            if f1_score is not None
+            else "" f"auc: {auc / step}"
+            if auc is not None
+            else ""
         )
         log.info(log_string)
         wandb.log(log_string)
