@@ -1,13 +1,14 @@
 import logging
+import os
 import random
-import urllib
 from typing import Optional
 
 import numpy as np
+import pandas as pd
 import torch
 import wandb
 
-from core.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, session
+from core.config import session
 
 log = logging.getLogger("__main__")
 log.setLevel(logging.INFO)
@@ -68,24 +69,59 @@ def upload_model_to_s3(
     log.info("모델 업로드 완료")
 
 
-def translate_with_papago(text: str, source_language: str, target_language: str) -> str:
-    encoding_text = urllib.parse.quote(text)
-    data = f"source={source_language}&target={target_language}&text={encoding_text}"
-    url = "https://openapi.naver.com/v1/papago/n2mt"
-    request = urllib.request.Request(url)
-    request.add_header("X-Naver-Client-Id", NAVER_CLIENT_ID)
-    request.add_header("X-Naver-Client-Secret", NAVER_CLIENT_SECRET)
-    response = urllib.request.urlopen(request, data=data.encode("utf-8"))
-    rescode = response.getcode()
-    if rescode == 200:
-        response_body = eval(response.read().decode("utf-8").replace("null", "None"))
-        return response_body["message"]["result"]["translatedText"]
-    else:
-        log.info("Error Code:" + rescode)
-        return ""
+def split_test_dataset(
+    dataset_path: str = "../static/labeled_dataset.csv", test_rate: float = 0.2, seed: int = 42
+) -> None:
+    df = pd.read_csv(dataset_path)
+    random.seed(seed)
+    answer_id_list = list(df.index)
+    random.shuffle(answer_id_list)
+    start_val_idx = int(len(answer_id_list) * (1 - test_rate))
+    train_id_list, test_id_list = answer_id_list[:start_val_idx], answer_id_list[start_val_idx:]
+    train_df, test_df = df.iloc[train_id_list], df.iloc[test_id_list]
+    dir_name = os.path.dirname(dataset_path)
+    train_df.to_csv(f"{dir_name}/train.csv", index=False)
+    test_df.to_csv(f"{dir_name}/test.csv", index=False)
 
 
-def back_translate(text: str) -> str:
-    translated_text = translate_with_papago(text, "ko", "en")
-    back_translation_text = translate_with_papago(translated_text, "en", "ko")
-    return back_translation_text
+# def translate_with_papago(text: str, source_language: str, target_language: str) -> str:
+#     encoding_text = urllib.parse.quote(text)
+#     data = f"source={source_language}&target={target_language}&text={encoding_text}"
+#     url = "https://openapi.naver.com/v1/papago/n2mt"
+#     request = urllib.request.Request(url)
+#     request.add_header("X-Naver-Client-Id", NAVER_CLIENT_ID)
+#     request.add_header("X-Naver-Client-Secret", NAVER_CLIENT_SECRET)
+#     response = urllib.request.urlopen(request, data=data.encode("utf-8"))
+#     rescode = response.getcode()
+#     if rescode == 200:
+#         response_body = eval(response.read().decode("utf-8").replace("null", "None"))
+#         return response_body["message"]["result"]["translatedText"]
+#     else:
+#         log.info("Error Code:" + rescode)
+#         return ""
+#
+#
+# def back_translate(text: str) -> str:
+#     translated_text = translate_with_papago(text, "ko", "en")
+#     time.sleep(1)
+#     back_translation_text = translate_with_papago(translated_text, "en", "ko")
+#     time.sleep(1)
+#     return back_translation_text
+#
+#
+# def back_translation_augmentation(train_csv_path: str) -> None:
+#     df = pd.read_csv(train_csv_path)
+#     log.info(f"previous data size : {len(df)}")
+#     df["user_answer"] = df["user_answer"].apply(
+#         lambda x: x.strip().replace("\n", "").replace("\xa0", "").replace("  ", " ")
+#     )
+#     df["user_answer"].replace("", np.nan, inplace=True)
+#     df.dropna(axis=0, subset=["user_answer"], inplace=True)  # 빈 답변 제거
+#     new_df = df.copy()
+#     for idx in new_df.index:
+#         back_translated_user_answer = back_translate(new_df.iloc[idx].user_answer)
+#         new_df.iloc[idx].user_answer = back_translated_user_answer
+#     new_df = pd.concat([df, new_df])
+#     dir_name = os.path.dirname(train_csv_path)
+#     log.info(f"augmented train data size : {len(new_df)}")
+#     new_df.to_csv(f"{dir_name}/augmented_train.csv", index=False)

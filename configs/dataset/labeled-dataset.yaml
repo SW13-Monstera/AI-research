@@ -3,7 +3,6 @@ train:
   seed: 42
   dataset_path: ${oc.env:PROJECT_ROOT}/static/train.csv
   shuffle: False
-  use_back_translation_augmentation: True
 
 
 test:
