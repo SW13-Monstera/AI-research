@@ -56,14 +56,15 @@ def train(
             del inputs, loss
             optimizer.step()
             optimizer.zero_grad()
-            if step % cfg.logging_steps == 1:
-                print_result(test_type="train", epoch=epoch, step=step, loss=total_loss)
+            if step % cfg.logging_steps == 0 and step >= cfg.logging_steps:
+                print_result(test_type="train", epoch=epoch, step=step + 1, loss=total_loss)
             torch.cuda.empty_cache()
 
         test(model, val_data_loader, criterion, early_stopping)
 
         if early_stopping.early_stop:
             log.info("Early stopping")
+            log.info(f"best auuracy is {early_stopping.best_acc}")
             break
 
 
@@ -87,7 +88,8 @@ def test(
             total_f1 += f1
             del inputs, loss
     avg_loss = total_loss / len(test_data_loader)
-    early_stopping(avg_loss, model)
+    acc = total_acc / len(test_data_loader)
+    early_stopping(avg_loss, model, acc)
 
     print_result(
         test_type="val",
@@ -101,13 +103,18 @@ def test(
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
 def main(cfg: DictConfig) -> None:
+    experiment_description = input("experiment description : ")
     seed_everything(cfg.seed)
     log.info(cfg)
 
     date_folder = sorted(os.listdir("./outputs"))[-1]
     time_folder = sorted(os.listdir(f"./outputs/{date_folder}"))[-1]
     wandb.init(
-        project="CS-broker", entity="ekzm8523", config=cfg, name=f"{date_folder}-{time_folder}", notes=cfg.description
+        project="CS-broker",
+        entity="ekzm8523",
+        config=cfg,
+        name=f"{date_folder}-{time_folder}",
+        notes=experiment_description,
     )
 
     model_class = get_model_class(plm_type=cfg.model.name)
@@ -146,6 +153,7 @@ def main(cfg: DictConfig) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"running on : {device}")
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
+    prompt_model.load_state_dict(torch.load("./outputs/2022-09-18/18-10-05/best_model.pt"))
     prompt_model.to(device)
     criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]
@@ -170,14 +178,14 @@ def main(cfg: DictConfig) -> None:
         optimizer=optimizer,
     )
 
-    hydra_outputs_folder = f"outputs/{date_folder}/{time_folder}/"
+    local_model_path = f"outputs/{date_folder}/{time_folder}/best_model.pt"
     if cfg.upload_model_to_s3:
         folder = f"ai-models/{date_folder}/{time_folder}"
         upload_model_to_s3(
-            local_path=hydra_outputs_folder,
+            local_path=local_model_path,
             bucket=cfg.s3_bucket,
             folder=folder,
-            model_name="model.pth",
+            model_name="best_model.pt",
         )
 
 

@@ -32,17 +32,16 @@ def print_result(
     epoch: Optional[int] = None,
 ) -> None:
     if step != 0:
-        log_string = (
-            f"[{test_type}] " f"Epoch {epoch} "
-            if epoch is not None
-            else "" + f"{test_type} loss: {loss / step} " + f"accuracy: {accuracy_score / step} "
-            if accuracy_score is not None
-            else "" + f"f1_score: {f1_score / step}"
-            if f1_score is not None
-            else ""
-        )
-        log.info(log_string)
-        if test_type == "val":
+        if test_type == "train":
+            log_string = f"[{test_type}] Epoch {epoch} loss: {loss / step} "
+            log.info(log_string)
+            wandb.log({"train loss": loss / step})
+        else:
+            log_string = (
+                f"[{test_type}] Epoch {epoch} loss: {loss / step}"
+                f" accuracy: {accuracy_score / step} f1_score: {f1_score / step}"
+            )
+            log.info(log_string)
             wandb.log(
                 {
                     "val loss": loss / step,
@@ -50,8 +49,6 @@ def print_result(
                     "f1_score": f1_score / step,
                 }
             )
-        else:
-            wandb.log({"train loss": loss / step})
 
 
 def upload_model_to_s3(
