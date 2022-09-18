@@ -9,6 +9,7 @@ from openprompt.data_utils import InputExample
 from openprompt.prompts import ManualTemplate
 from pydantic import BaseModel
 from transformers import PreTrainedTokenizer
+from utils import back_translate
 
 from datasets import DatasetDict, load_dataset
 from prompt_tuning.utils import log
@@ -111,14 +112,16 @@ class PromptNliDataModule:
 
 
 class PromptLabeledDataModule:
-    def __init__(self, dataset_path: str, seed: int = 42, shuffle: bool = False) -> None:
+    def __init__(
+        self, dataset_path: str, seed: int = 42, shuffle: bool = False, use_back_translation_augmentation: bool = False
+    ) -> None:
         self.seed: int = seed
         self.shuffle: bool = shuffle
+        self.use_back_translation_augmentation: bool = use_back_translation_augmentation
         self.dataset: List[RequiredGradingData] = self._load_labeled_dataset(dataset_path)
         self.prompt_input_dataset: List[InputExample] = self._convert_to_prompt_input_dataset()
 
-    @staticmethod
-    def _load_labeled_dataset(csv_path: str) -> List[RequiredGradingData]:
+    def _load_labeled_dataset(self, csv_path: str) -> List[RequiredGradingData]:
         df = pd.read_csv(csv_path)
         log.info(f"previous data size : {len(df)}")
         df["user_answer"] = df["user_answer"].apply(
@@ -127,6 +130,9 @@ class PromptLabeledDataModule:
         df["user_answer"].replace("", np.nan, inplace=True)
         df.dropna(axis=0, subset=["user_answer"], inplace=True)  # 빈 답변 제거
         log.info(f"after data size : {len(df)}")
+
+        if self.use_back_translation_augmentation:
+            df = self._back_translation_augmentation(df)
 
         if isinstance(df["correct_scoring_criterion"][0], str):  # list를 string으로 표현된 경우 type casting
             df["correct_scoring_criterion"] = df["correct_scoring_criterion"].apply(eval)
@@ -160,6 +166,14 @@ class PromptLabeledDataModule:
             )
             train_dataset.append(input_example)
         return train_dataset
+
+    @staticmethod
+    def _back_translation_augmentation(df: pd.DataFrame) -> pd.DataFrame:
+        new_df = df.copy()
+        for idx in new_df.index:
+            back_translated_user_answer = back_translate(new_df.iloc[idx].user_answer)
+            new_df.iloc[idx].user_answer = back_translated_user_answer
+        return pd.concat([df, new_df])
 
 
 def split_test_dataset(

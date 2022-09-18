@@ -1,12 +1,13 @@
 import logging
 import random
+import urllib
 from typing import Optional
 
 import numpy as np
 import torch
 import wandb
 
-from core.config import session
+from core.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, session
 
 log = logging.getLogger("__main__")
 log.setLevel(logging.INFO)
@@ -65,3 +66,26 @@ def upload_model_to_s3(
     log.info(f"{bucket}/{folder}/{model_name}에 모델 업로드중")
     s3.upload_file(local_path, bucket, f"{folder}/{model_name}")
     log.info("모델 업로드 완료")
+
+
+def translate_with_papago(text: str, source_language: str, target_language: str) -> str:
+    encoding_text = urllib.parse.quote(text)
+    data = f"source={source_language}&target={target_language}&text={encoding_text}"
+    url = "https://openapi.naver.com/v1/papago/n2mt"
+    request = urllib.request.Request(url)
+    request.add_header("X-Naver-Client-Id", NAVER_CLIENT_ID)
+    request.add_header("X-Naver-Client-Secret", NAVER_CLIENT_SECRET)
+    response = urllib.request.urlopen(request, data=data.encode("utf-8"))
+    rescode = response.getcode()
+    if rescode == 200:
+        response_body = eval(response.read().decode("utf-8").replace("null", "None"))
+        return response_body["message"]["result"]["translatedText"]
+    else:
+        log.info("Error Code:" + rescode)
+        return ""
+
+
+def back_translate(text: str) -> str:
+    translated_text = translate_with_papago(text, "ko", "en")
+    back_translation_text = translate_with_papago(translated_text, "en", "ko")
+    return back_translation_text
