@@ -3,27 +3,15 @@ from typing import Tuple
 
 import numpy as np
 import torch
-from openprompt import PromptForClassification
-from openprompt.data_utils import InputFeatures
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-from torch import Tensor
+from sklearn.metrics import accuracy_score, f1_score
 
 log = logging.getLogger("__main__")
 
 
-def calculate_metric(labels, predicts) -> Tuple[float, float, float]:
+def calculate_metric(labels, predicts) -> Tuple[float, float]:
     acc = accuracy_score(labels, predicts)
     f1 = f1_score(labels, predicts)
-    auc = roc_auc_score(labels, predicts)
-    return acc, f1, auc
-
-
-def get_predicts(inputs: InputFeatures, prompt_model: PromptForClassification) -> Tensor:
-    device = prompt_model.device
-    inputs = inputs.to(device)
-    logits = prompt_model(inputs)
-    predicts = torch.argmax(logits, dim=1).cpu().numpy()
-    return predicts
+    return acc, f1
 
 
 class EarlyStopping:

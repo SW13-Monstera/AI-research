@@ -23,6 +23,7 @@ defaults:
 
 # task name, determines output directory paths
 task_name: "prompt_nli"
+description: "KLUE NLI dataset만 가지고 base model에서 epoch 30으로 돌린 모델 (Early Stop 5)"
 
 # tags to help you identify your experiments
 # you can overwrite this in experiment configs
@@ -42,12 +43,12 @@ test: True
 ckpt_path: null
 
 seed: 42
-epochs: 5
+epochs: 30
 lr: 0.0001
 logging_steps: 100
 weight_decay: 0.1
-
-upload_model_to_s3: False
+early_stopping: 3
+upload_model_to_s3: True
 s3_bucket: cs-broker-bucket
 
 huggingface_repo: ekzm8523/cs-boker-mt5-base

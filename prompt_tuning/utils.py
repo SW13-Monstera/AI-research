@@ -1,12 +1,10 @@
 import logging
-import os
 import random
 from typing import Optional
 
 import numpy as np
 import torch
 import wandb
-from openprompt import PromptForClassification
 
 from core.config import session
 
@@ -31,27 +29,33 @@ def print_result(
     loss: float,
     accuracy_score: Optional[float] = None,
     f1_score: Optional[float] = None,
-    auc: Optional[float] = None,
     epoch: Optional[int] = None,
 ) -> None:
     if step != 0:
         log_string = (
             f"[{test_type}] " f"Epoch {epoch} "
             if epoch is not None
-            else "" f"{test_type} loss: {loss / step} " f"accuracy: {accuracy_score / step} "
+            else "" + f"{test_type} loss: {loss / step} " + f"accuracy: {accuracy_score / step} "
             if accuracy_score is not None
-            else "" f"f1_score: {f1_score / step}"
+            else "" + f"f1_score: {f1_score / step}"
             if f1_score is not None
-            else "" f"auc: {auc / step}"
-            if auc is not None
             else ""
         )
         log.info(log_string)
-        wandb.log(log_string)
+        if test_type == "val":
+            wandb.log(
+                {
+                    "val loss": loss / step,
+                    "accuracy": accuracy_score / step,
+                    "f1_score": f1_score / step,
+                }
+            )
+        else:
+            wandb.log({"train loss": loss / step})
 
 
 def upload_model_to_s3(
-    model: PromptForClassification,
+    local_path: str = "checkpoint.pt",
     bucket: str = "cs-broker-bucket",
     folder: str = "ai-models/default",
     model_name: str = "model.pth",
@@ -61,13 +65,6 @@ def upload_model_to_s3(
         s3.create_bucket(Bucket=bucket)
         log.info(f"{bucket} bucket 생성")
 
-    local_path = f"./{model_name}"
-    log.info(f"{local_path}에 임시 모델이 생성")
-    torch.save(model.state_dict(), local_path)
-
-    log.info(f"{os.path.join(bucket, folder, model_name)}에 모델 업로드중")
-    s3.upload_file(local_path, bucket, os.path.join(folder, model_name))
+    log.info(f"{bucket}/{folder}/{model_name}에 모델 업로드중")
+    s3.upload_file(local_path, bucket, f"{folder}/{model_name}")
     log.info("모델 업로드 완료")
-
-    log.info(f"{local_path}의 임시 모델 삭제")
-    os.remove(local_path)
