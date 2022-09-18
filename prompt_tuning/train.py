@@ -1,4 +1,5 @@
 import os
+from typing import Union
 
 import hydra
 import pyrootutils
@@ -106,7 +107,7 @@ def main(cfg: DictConfig) -> None:
     date_folder = sorted(os.listdir("./outputs"))[-1]
     time_folder = sorted(os.listdir(f"./outputs/{date_folder}"))[-1]
     wandb.init(
-        project="CS-broker", entity="ekzm8523", config=cfg, name=f"{date_folder}-{time_folder}", note=cfg.description
+        project="CS-broker", entity="ekzm8523", config=cfg, name=f"{date_folder}-{time_folder}", notes=cfg.description
     )
 
     model_class = get_model_class(plm_type=cfg.model.name)
@@ -120,29 +121,32 @@ def main(cfg: DictConfig) -> None:
     log.info(f"new special_token : {special_tokens}")
 
     WrapperClass = model_class.wrapper
-
-    nli_data_module: PromptNliDataModule = hydra.utils.instantiate(cfg.dataset.nli)
-
     template_text = '{"placeholder":"text_a"} Question: {"placeholder":"text_b"}? Is it correct? {"mask"}.'
     template = ManualTemplate(tokenizer=tokenizer, text=template_text)
 
     prompt_loader: PromptLoader = hydra.utils.instantiate(cfg.dataset.loader)
-    train_data_loader, val_data_loader = [
-        prompt_loader.get_loader(
-            dataset=nli_data_module.prompt_input_dataset[data_type],
-            template=template,
-            tokenizer=tokenizer,
-            tokenizer_wrapper_class=WrapperClass,
-        )
-        for data_type in ["train", "val"]
-    ]
+
+    train_data_module: Union[PromptLabeledDataModule, PromptNliDataModule] = hydra.utils.instantiate(cfg.dataset.train)
+    test_data_module: PromptLabeledDataModule = hydra.utils.instantiate(cfg.dataset.test)
+    train_data_loader = prompt_loader.get_loader(
+        dataset=train_data_module.prompt_input_dataset,
+        template=template,
+        tokenizer=tokenizer,
+        tokenizer_wrapper_class=WrapperClass,
+    )
+    test_data_loader = prompt_loader.get_loader(
+        dataset=test_data_module.prompt_input_dataset,
+        template=template,
+        tokenizer=tokenizer,
+        tokenizer_wrapper_class=WrapperClass,
+    )
+
     verbalizer = ManualVerbalizer(tokenizer=tokenizer, num_classes=2, label_words=[["yes"], ["no"]])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"running on : {device}")
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
     prompt_model.to(device)
-    # prompt_model.load_state_dict(torch.load("./jw-mt5-base.bin"))
     criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
@@ -161,27 +165,7 @@ def main(cfg: DictConfig) -> None:
         cfg=cfg,
         model=prompt_model,
         train_data_loader=train_data_loader,
-        val_data_loader=val_data_loader,
-        criterion=criterion,
-        optimizer=optimizer,
-    )
-
-    labeled_data_module: PromptLabeledDataModule = hydra.utils.instantiate(cfg.dataset.labeled)
-    train_data_loader, val_data_loader = [
-        prompt_loader.get_loader(
-            dataset=labeled_data_module.prompt_input_dataset[data_type],
-            template=template,
-            tokenizer=tokenizer,
-            tokenizer_wrapper_class=WrapperClass,
-        )
-        for data_type in ["train", "val"]
-    ]
-
-    train(
-        cfg=cfg,
-        model=prompt_model,
-        train_data_loader=train_data_loader,
-        val_data_loader=val_data_loader,
+        val_data_loader=test_data_loader,
         criterion=criterion,
         optimizer=optimizer,
     )
