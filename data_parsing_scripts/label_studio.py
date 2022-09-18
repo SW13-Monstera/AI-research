@@ -1,7 +1,7 @@
 import requests
 from label_studio_sdk import Client
 
-from data.dataset import UserAnswer
+from data_parsing_scripts.dataset import UserAnswer
 
 SCORING_ANNOTATION = "dynamic_choices2"
 KEYWORD_ANNOTATION = "dynamic_choices"

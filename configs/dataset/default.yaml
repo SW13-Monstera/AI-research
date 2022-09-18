@@ -1,0 +1,25 @@
+nli:
+  _target_: prompt_tuning.dataset.PromptNliDataModule
+  seed: 42
+  dataset_path: klue
+  dataset_name: nli
+  split_rate: [8, 1, 1]
+  shuffle: False
+
+
+labeled:
+  _target_: prompt_tuning.dataset.PromptLabeledDataModule
+  seed: 42
+  dataset_path: ${oc.env:PROJECT_ROOT}/static/labeled_dataset.csv
+  split_rate: [8, 1, 1]
+  shuffle: True
+
+
+loader:
+  _target_: prompt_tuning.dataset.PromptLoader
+  max_seq_length: 256
+  decoder_max_length: 3
+  batch_size: 4
+  teacher_forcing: False
+  predict_eos_token: False
+  truncate_method: head

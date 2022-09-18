@@ -2,9 +2,9 @@ import csv
 from datetime import datetime
 
 from core import config as settings
-from data.air_table import get_required_labelling_record
-from data.dataset import UserAnswer
-from data.label_studio import LabelStudioAPI
+from data_parsing_scripts.air_table import get_required_labelling_record
+from data_parsing_scripts.dataset import UserAnswer
+from data_parsing_scripts.label_studio import LabelStudioAPI
 
 
 def upload_unlabeled_data_to_label_studio_from_air_table() -> None:

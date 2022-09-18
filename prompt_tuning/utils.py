@@ -22,10 +22,13 @@ def seed_everything(seed):
 def print_result(
     test_type: str, step: int, loss: float, accuracy_score: float, f1_score: float, epoch: Optional[int] = None
 ) -> None:
-    log.info(
-        f"[{test_type}] ",
-        f"Epoch {epoch} " if epoch is None else "",
-        f"{test_type} loss: {loss / step} ",
-        f"accuracy: {accuracy_score / step} ",
-        f"f1_score: {f1_score / step}",
-    )
+    if step != 0:
+        log.info(
+            (
+                f"[{test_type}] "
+                f"Epoch {epoch if epoch is not None else ''} "
+                f"{test_type} loss: {loss / step} "
+                f"accuracy: {accuracy_score / step} "
+                f"f1_score: {f1_score / step}"
+            )
+        )
