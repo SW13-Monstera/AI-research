@@ -97,7 +97,7 @@ class PromptNliDataModule:
             random.shuffle(every_dataset)
 
         train_dataset = []
-        for i, data in enumerate(every_dataset):
+        for data in every_dataset:
             input_example = InputExample(
                 text_a=data["premise"],
                 text_b=data["hypothesis"],
