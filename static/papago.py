@@ -1,4 +1,3 @@
-import os
 import time
 
 import numpy as np
@@ -19,13 +18,13 @@ def translate_with_papago(text: str, source_language: str, target_language: str)
     """
     try:
         driver.get(f"https://papago.naver.com/?sk={source_language}&tk={target_language}&st={text}")
-        time.sleep(2.5)
+        time.sleep(3)
         translated_text = driver.find_element(By.XPATH, r'//*[@id="txtTarget"]').text
         return translated_text
     except:  # noqa
         driver.get(f"https://papago.naver.com/?sk={source_language}&tk={target_language}")
         driver.find_element(By.XPATH, r'//*[@id="txtSource"]').send_keys(text)
-        time.sleep(2.5)
+        time.sleep(3)
         translated_text = driver.find_element(By.XPATH, r'//*[@id="txtTarget"]').text
         return translated_text
 
@@ -47,6 +46,7 @@ def back_translation_augmentation(train_csv_path: str, start_idx: int = 0) -> No
     new_df = df.copy()
     try:
         for idx in new_df.index:
+            print(idx)
             if len(new_df.iloc[idx].user_answer) < 3:
                 continue
             if idx < start_idx:
@@ -55,12 +55,9 @@ def back_translation_augmentation(train_csv_path: str, start_idx: int = 0) -> No
             new_df.iloc[idx].user_answer = back_translated_user_answer
     except:  # noqa
         print(f"에러가 발생했으니 {idx}부터 다시 시작하세요")
-        new_df = pd.concat([df, new_df])
-        dir_name = os.path.dirname(train_csv_path)
-        new_df.to_csv(f"{dir_name}/augmented_temp.csv", index=False)
+        new_df.to_csv("./augmented_temp.csv", index=False)
     else:
         new_df = pd.concat([df, new_df])
-        dir_name = os.path.dirname(train_csv_path)
         print(f"augmented train data size : {len(new_df)}")
-        new_df.to_csv(f"{dir_name}/augmented_train.csv", index=False)
-        print(f"saved at {dir_name}/augmented_train.csv")
+        new_df.to_csv("./augmented_train.csv", index=False)
+        print("saved at ./augmented_train.csv")

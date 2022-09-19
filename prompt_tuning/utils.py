@@ -35,15 +35,15 @@ def print_result(
 ) -> None:
     if step != 0:
         if test_type == "train":
-            log_string = f"[{test_type}] Epoch {epoch} loss: {loss / step} "
-            log.info(log_string)
+            log.info(f"[{test_type}] Epoch {epoch} loss: {loss / step} ")
             wandb.log({"train loss": loss / step})
         else:
-            log_string = (
-                f"[{test_type}] Epoch {epoch} loss: {loss / step}"
-                f" accuracy: {accuracy_score / step} f1_score: {f1_score / step}"
+            log.info(
+                (
+                    f"[{test_type}] Epoch {epoch} loss: {loss / step}"
+                    f" accuracy: {accuracy_score / step} f1_score: {f1_score / step}"
+                )
             )
-            log.info(log_string)
             wandb.log(
                 {
                     "val loss": loss / step,
