@@ -35,7 +35,7 @@ def back_translate(text: str) -> str:
     return back_translation_text
 
 
-def back_translation_augmentation(train_csv_path: str, start_idx: int = 0) -> None:
+def back_translation_augmentation(train_csv_path: str) -> None:
     df = pd.read_csv(train_csv_path)
     print(f"previous data size : {len(df)}")
     df["user_answer"] = df["user_answer"].apply(
@@ -43,21 +43,28 @@ def back_translation_augmentation(train_csv_path: str, start_idx: int = 0) -> No
     )
     df["user_answer"].replace("", np.nan, inplace=True)
     df.dropna(axis=0, subset=["user_answer"], inplace=True)  # 빈 답변 제거
-    new_df = df.copy()
-    try:
-        for idx in new_df.index:
-            print(idx)
-            if len(new_df.iloc[idx].user_answer) < 3:
-                continue
-            if idx < start_idx:
-                continue
-            back_translated_user_answer = back_translate(new_df.iloc[idx].user_answer)
-            new_df.iloc[idx].user_answer = back_translated_user_answer
-    except:  # noqa
-        print(f"에러가 발생했으니 {idx}부터 다시 시작하세요")
-        new_df.to_csv("./augmented_temp.csv", index=False)
-    else:
-        new_df = pd.concat([df, new_df])
-        print(f"augmented train data size : {len(new_df)}")
-        new_df.to_csv("./augmented_train.csv", index=False)
-        print("saved at ./augmented_train.csv")
+    new_df = pd.read_csv("./augmented_train.csv")
+
+    for idx in new_df.index:
+        if new_df.iloc[idx].user_answer == df.iloc[idx].user_answer:
+            while True:
+                try:
+                    print(idx)
+                    if len(new_df.iloc[idx].user_answer) < 3:
+                        continue
+                    back_translated_user_answer = back_translate(new_df.iloc[idx].user_answer)
+                    new_df.iloc[idx].user_answer = back_translated_user_answer
+                except:  # noqa
+                    print(f"에러가 발생했으니 {idx}부터 다시 시작합니다")
+                    new_df.to_csv("./augmented_temp.csv", index=False)
+                else:
+                    break
+
+    new_df = pd.concat([df, new_df])
+    print(f"augmented train data size : {len(new_df)}")
+    new_df.to_csv("./augmented_train.csv", index=False)
+    print("saved at ./augmented_train.csv")
+
+
+if __name__ == "__main__":
+    back_translation_augmentation(train_csv_path="train.csv")

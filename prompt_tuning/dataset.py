@@ -155,7 +155,7 @@ class PromptLabeledDataModule:
                 text_a=data.premise,
                 text_b=data.hypothesis,
                 label=data.label,
-                guid=data.guid,
+                guid=data.answer_id,
             )
             train_dataset.append(input_example)
         return train_dataset

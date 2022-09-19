@@ -1,7 +1,6 @@
 import logging
 import os
 import random
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -25,32 +24,14 @@ def seed_everything(seed):
     random.seed(seed)
 
 
-def print_result(
-    test_type: str,
-    step: int,
-    loss: float,
-    accuracy_score: Optional[float] = None,
-    f1_score: Optional[float] = None,
-    epoch: Optional[int] = None,
-) -> None:
-    if step != 0:
-        if test_type == "train":
-            log.info(f"[{test_type}] Epoch {epoch} loss: {loss / step} ")
-            wandb.log({"train loss": loss / step})
-        else:
-            log.info(
-                (
-                    f"[{test_type}] Epoch {epoch} loss: {loss / step}"
-                    f" accuracy: {accuracy_score / step} f1_score: {f1_score / step}"
-                )
-            )
-            wandb.log(
-                {
-                    "val loss": loss / step,
-                    "accuracy": accuracy_score / step,
-                    "f1_score": f1_score / step,
-                }
-            )
+def print_train(loss: float, epoch: int) -> None:
+    log.info(f"[Train] Epoch {epoch} loss: {loss} ")
+    wandb.log({"train loss": loss})
+
+
+def print_test(loss: float, accuracy: float, f1_score: float, joint_goal_accuracy: float) -> None:
+    log.info(f"[test] loss: {loss} accuracy: {accuracy} f1_score: {f1_score} JGA: {joint_goal_accuracy}")
+    wandb.log({"val loss": loss, "accuracy": accuracy, "f1_score": f1_score, "JGA": joint_goal_accuracy})
 
 
 def upload_model_to_s3(

@@ -5,14 +5,14 @@ import hydra
 import pyrootutils
 import torch
 import wandb
-from loss import EarlyStopping, calculate_metric
+from loss import EarlyStopping
 from omegaconf import DictConfig
 from openprompt import PromptDataLoader, PromptForClassification
 from openprompt.plms import get_model_class
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from torch.optim import AdamW
 from tqdm import tqdm
-from utils import log, print_result, seed_everything, upload_model_to_s3
+from utils import log, print_test, print_train, seed_everything, upload_model_to_s3
 
 from core.config import HUGGING_FACE_ACCESS_TOKEN
 from prompt_tuning.dataset import (
@@ -20,6 +20,7 @@ from prompt_tuning.dataset import (
     PromptLoader,
     PromptNliDataModule,
 )
+from prompt_tuning.evaluation import Evaluator
 
 root = pyrootutils.setup_root(
     search_from=__file__,
@@ -56,9 +57,10 @@ def train(
             del inputs, loss
             optimizer.step()
             optimizer.zero_grad()
-            if step % cfg.logging_steps == 0 and step >= cfg.logging_steps:
-                print_result(test_type="train", epoch=epoch, step=step + 1, loss=total_loss)
+            if (step + 1) % cfg.logging_steps == 0 and (step + 1) >= cfg.logging_steps:
+                print_train(epoch=epoch, loss=total_loss / (step + 1))
             torch.cuda.empty_cache()
+            break
 
         test(model, val_data_loader, criterion, early_stopping)
 
@@ -74,29 +76,29 @@ def test(
     criterion: torch.nn.Module,
     early_stopping: EarlyStopping,
 ) -> None:
-    total_loss = total_acc = total_f1 = 0
+
     device = model.device
+    evaluator = Evaluator()
+
     with torch.no_grad():
         for inputs in tqdm(test_data_loader):
             inputs = inputs.to(device)
             logits = model(inputs)
             predicts = torch.argmax(logits, dim=1).cpu().numpy()
+            labels = inputs.label.cpu().numpy()
+            guids = inputs.guid.cpu().numpy()
             loss = criterion(logits, inputs.label)
-            acc, f1 = calculate_metric(inputs.label.cpu().numpy(), predicts)
-            total_loss += loss.item()
-            total_acc += acc
-            total_f1 += f1
+            evaluator.save(labels, predicts, guids, loss.item())
             del inputs, loss
-    avg_loss = total_loss / len(test_data_loader)
-    acc = total_acc / len(test_data_loader)
-    early_stopping(avg_loss, model, acc)
+            break
+    evaluator.compute()
+    early_stopping(evaluator.loss, model, evaluator.acc)
 
-    print_result(
-        test_type="val",
-        step=len(test_data_loader),
-        loss=total_loss,
-        accuracy_score=total_acc,
-        f1_score=total_f1,
+    print_test(
+        loss=evaluator.loss,
+        accuracy=evaluator.acc,
+        f1_score=evaluator.f1_score,
+        joint_goal_accuracy=evaluator.joint_goal_acc,
     )
     torch.cuda.empty_cache()
 
@@ -153,7 +155,7 @@ def main(cfg: DictConfig) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"running on : {device}")
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
-    prompt_model.load_state_dict(torch.load("./outputs/2022-09-18/18-10-05/best_model.pt"))
+    # prompt_model.load_state_dict(torch.load("./outputs/2022-09-18/18-10-05/best_model.pt"))
     prompt_model.to(device)
     criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]
