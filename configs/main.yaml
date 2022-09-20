@@ -4,7 +4,7 @@
 # order of defaults determines the order in which configs override each other
 defaults:
   - _self_
-  - dataset: labeled-dataset.yaml
+  - dataset: nli-dataset.yaml
   - model: mt5-base.yaml
   - paths: default.yaml
   # experiment configs allow for version control of specific hyperparameters
@@ -51,3 +51,5 @@ upload_model_to_s3: True
 s3_bucket: cs-broker-bucket
 
 huggingface_repo: ekzm8523/cs-boker-mt5-base
+
+use_pretrained_model: False

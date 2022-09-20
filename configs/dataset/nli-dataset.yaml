@@ -1,3 +1,5 @@
+name: nli
+
 train:
   _target_: prompt_tuning.dataset.PromptNliDataModule
   seed: 42

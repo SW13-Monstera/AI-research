@@ -41,8 +41,12 @@ def train(
     # wandb.watch(model, criterion, log="all", log_freq=100)
     date_folder = sorted(os.listdir("./outputs"))[-1]
     time_folder = sorted(os.listdir(f"./outputs/{date_folder}"))[-1]
+    early_stopping_standard = EarlyStopping.LOSS if cfg.dataset.name == "nli" else EarlyStopping.JGA
     early_stopping = EarlyStopping(
-        patience=cfg.early_stopping, verbose=True, path=f"outputs/{date_folder}/{time_folder}/best_model.pt"
+        standard=early_stopping_standard,
+        patience=cfg.early_stopping,
+        verbose=True,
+        path=f"outputs/{date_folder}/{time_folder}/best_model.pt",
     )
     device = model.device
     for epoch in range(cfg.epochs):
@@ -60,8 +64,8 @@ def train(
             if (step + 1) % cfg.logging_steps == 0 and (step + 1) >= cfg.logging_steps:
                 print_train(epoch=epoch, loss=total_loss / (step + 1))
             torch.cuda.empty_cache()
-
-        test(model, val_data_loader, criterion, early_stopping)
+            break
+        test(model, val_data_loader, criterion, early_stopping, epoch)
 
         if early_stopping.early_stop:
             log.info("Early stopping")
@@ -74,6 +78,7 @@ def test(
     test_data_loader: PromptDataLoader,
     criterion: torch.nn.Module,
     early_stopping: EarlyStopping,
+    epoch: int,
 ) -> None:
 
     device = model.device
@@ -89,14 +94,17 @@ def test(
             loss = criterion(logits, inputs.label)
             evaluator.save(labels, predicts, guids, loss.item())
             del inputs, loss
+            break
     evaluator.compute()
-    early_stopping(model, evaluator.joint_goal_acc)
+    standard_value = evaluator.loss if early_stopping.standard == EarlyStopping.LOSS else evaluator.joint_goal_acc
+    early_stopping(model, standard_value)
 
     print_test(
         loss=evaluator.loss,
         accuracy=evaluator.acc,
         f1_score=evaluator.f1_score,
         joint_goal_accuracy=evaluator.joint_goal_acc,
+        epoch=epoch,
     )
     torch.cuda.empty_cache()
 
@@ -153,7 +161,8 @@ def main(cfg: DictConfig) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"running on : {device}")
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
-    prompt_model.load_state_dict(torch.load("./outputs/2022-09-20/03-46-57/best_model.pt"))
+    if cfg.use_pretrained_model:
+        prompt_model.load_state_dict(torch.load(cfg.paths.pretrain_model_path))
     prompt_model.to(device)
     criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]

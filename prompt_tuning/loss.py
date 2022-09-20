@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
@@ -15,8 +15,18 @@ def calculate_metric(labels, predicts) -> Tuple[float, float]:
 
 
 class EarlyStopping:
-    # 주어진 patience 이후로 validation loss가 개선되지 않으면 학습을 조기 중지
-    def __init__(self, patience=7, verbose=False, delta=0, path="checkpoint.pt"):
+    LOSS = "loss"
+    JGA = "joint_goal_accuracy"
+    ACC = "accuracy"
+
+    def __init__(
+        self,
+        standard: Optional[str],
+        patience: int = 7,
+        verbose: bool = False,
+        delta: int = 0,
+        path: str = "checkpoint.pt",
+    ):
         """
         Args:
             patience (int): validation loss가 개선된 후 기다리는 기간
@@ -38,35 +48,36 @@ class EarlyStopping:
         self.path = path
         self.best_acc = 0
         self.best_joint_goal_accuracy = 0
+        self.standard = standard if standard else self.JGA
 
-    def __call__(self, model, joint_goal_accuracy):
+    def __call__(self, model, standard_value):
 
-        if self.best_joint_goal_accuracy > joint_goal_accuracy:
-            self.counter += 1
-            log.info(f"EarlyStopping counter: {self.counter} out of {self.patience}")
-            if self.counter >= self.patience:
-                self.early_stop = True
-        else:
-            self.save_checkpoint(joint_goal_accuracy, model)
-            self.counter = 0
-        # if self.best_score is None:
-        #     self.best_score = score
-        # elif score < self.best_score + self.delta:
-        #     self.counter += 1
-        #     log.info(f"EarlyStopping counter: {self.counter} out of {self.patience}")
-        #     if self.counter >= self.patience:
-        #         self.early_stop = True
-        # else:
-        #     self.best_score = score
-        #     self.save_checkpoint(val_loss, model)
-        #     self.counter = 0
-        # self.best_acc = max(self.best_score, acc)
+        if self.standard is self.JGA:
+            if self.best_joint_goal_accuracy > standard_value:
+                self.counter += 1
+                log.info(f"EarlyStopping counter: {self.counter} out of {self.patience}")
+                if self.counter >= self.patience:
+                    self.early_stop = True
+            else:
+                if self.verbose:
+                    log.info(
+                        f"New best model JGA : ({self.best_joint_goal_accuracy:.6f}"
+                        f" --> {standard_value:.6f}) Saving model"
+                    )
+                torch.save(model.state_dict(), self.path)
+                self.best_joint_goal_accuracy = standard_value
+                self.counter = 0
 
-    def save_checkpoint(self, joint_goal_accuracy, model):
-        # validation loss가 감소하면 모델을 저장
-        if self.verbose:
-            log.info(
-                f"New best model JGA : ({self.best_joint_goal_accuracy:.6f} --> {joint_goal_accuracy:.6f}) Saving model"
-            )
-        torch.save(model.state_dict(), self.path)
-        self.best_joint_goal_accuracy = joint_goal_accuracy
+        elif self.standard is self.LOSS:
+            if self.val_loss_min < standard_value:
+                self.counter += 1
+                log.info(f"EarlyStopping counter: {self.counter} out of {self.patience}")
+                if self.counter >= self.patience:
+                    self.early_stop = True
+            else:
+
+                if self.verbose:
+                    log.info(f"New best model loss : ({self.val_loss_min:.6f} --> {standard_value:.6f}) Saving model")
+                torch.save(model.state_dict(), self.path)
+                self.val_loss_min = standard_value
+                self.counter = 0

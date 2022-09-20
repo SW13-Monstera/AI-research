@@ -29,9 +29,11 @@ def print_train(loss: float, epoch: int) -> None:
     wandb.log({"train loss": loss})
 
 
-def print_test(loss: float, accuracy: float, f1_score: float, joint_goal_accuracy: float) -> None:
+def print_test(loss: float, accuracy: float, f1_score: float, joint_goal_accuracy: float, epoch: int) -> None:
     log.info(f"[test] loss: {loss} accuracy: {accuracy} f1_score: {f1_score} JGA: {joint_goal_accuracy}")
-    wandb.log({"val loss": loss, "accuracy": accuracy, "f1_score": f1_score, "JGA": joint_goal_accuracy})
+    wandb.log(
+        {"epoch": epoch, "val loss": loss, "accuracy": accuracy, "f1_score": f1_score, "JGA": joint_goal_accuracy}
+    )
 
 
 def upload_model_to_s3(
