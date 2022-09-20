@@ -1,0 +1,19 @@
+program: prompt_tuning/train.py
+method: bayes
+metric:
+  goal: minimize
+  name: val_loss
+parameters:
+  lr:
+    min: 0.00001
+    max: 0.001
+  weight_decay:
+    values: [1e-5, 1e-6, 1e-7]
+  optimizer:
+    values: ["adam", "adamp", "adamw"]
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - ${args_no_hyphens}
