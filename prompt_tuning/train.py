@@ -1,20 +1,26 @@
+import os
+from typing import Union
+
 import hydra
 import pyrootutils
 import torch
-from loss import evaluation
+import wandb
+from loss import EarlyStopping
 from omegaconf import DictConfig
 from openprompt import PromptDataLoader, PromptForClassification
-from openprompt.plms import load_plm
+from openprompt.plms import get_model_class
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from torch.optim import AdamW
 from tqdm import tqdm
-from utils import log, print_result, seed_everything
+from utils import log, print_test, print_train, seed_everything, upload_model_to_s3
 
+from core.config import HUGGING_FACE_ACCESS_TOKEN
 from prompt_tuning.dataset import (
     PromptLabeledDataModule,
     PromptLoader,
     PromptNliDataModule,
 )
+from prompt_tuning.evaluation import Evaluator
 
 root = pyrootutils.setup_root(
     search_from=__file__,
@@ -25,75 +31,103 @@ root = pyrootutils.setup_root(
 
 
 def train(
-    epochs: int,
+    cfg: DictConfig,
     model: PromptForClassification,
     train_data_loader: PromptDataLoader,
     val_data_loader: PromptDataLoader,
     criterion: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
-    logging_steps: int,
 ) -> None:
-    best_acc = 0
-    for epoch in range(epochs):
-        total_loss = total_acc = total_f1 = 0
+    # wandb.watch(model, criterion, log="all", log_freq=100)
+    date_folder = sorted(os.listdir("./outputs"))[-1]
+    time_folder = sorted(os.listdir(f"./outputs/{date_folder}"))[-1]
+    early_stopping_standard = EarlyStopping.LOSS if cfg.dataset.name == "nli" else EarlyStopping.JGA
+    early_stopping = EarlyStopping(
+        standard=early_stopping_standard,
+        patience=cfg.early_stopping,
+        verbose=True,
+        path=f"outputs/{date_folder}/{time_folder}/best_model.pt",
+    )
+    device = model.device
+    for epoch in range(cfg.epochs):
+        total_loss = 0
         model.train()
         for step, inputs in enumerate(tqdm(train_data_loader)):
-            loss, acc, f1 = evaluation(inputs, model, criterion)
-            del inputs
+            inputs = inputs.to(device)
+            logits = model(inputs)
+            loss = criterion(logits, inputs.label)
             loss.backward()
             total_loss += loss.item()
-            total_acc += acc
-            total_f1 += f1
-            del loss
+            del inputs, loss
             optimizer.step()
             optimizer.zero_grad()
-            if step % logging_steps == 1:
-                print_result(
-                    test_type="train",
-                    epoch=epoch,
-                    step=step,
-                    loss=total_loss,
-                    accuracy_score=total_acc,
-                    f1_score=total_f1,
-                )
+            if (step + 1) % cfg.logging_steps == 0 and (step + 1) >= cfg.logging_steps:
+                print_train(epoch=epoch, loss=total_loss / (step + 1))
             torch.cuda.empty_cache()
+            break
+        test(model, val_data_loader, criterion, early_stopping, epoch)
 
-        val_loss = val_acc = val_f1 = 0
-        model.eval()
-        with torch.no_grad():
-            for inputs in tqdm(val_data_loader):
-                loss, acc, f1 = evaluation(inputs, model, criterion)
-                val_loss += loss.item()
-                val_acc += acc
-                val_f1 += f1
-
-        if best_acc < val_acc:
-            best_acc = val_acc
-            torch.save(model.state_dict(), "./jw-mt5-base.bin")
-        print_result(test_type="val", step=len(val_data_loader), loss=val_loss, accuracy_score=val_acc, f1_score=val_f1)
-        torch.cuda.empty_cache()
+        if early_stopping.early_stop:
+            log.info("Early stopping")
+            log.info(f"best auuracy is {early_stopping.best_acc}")
+            break
 
 
-def test(model: PromptForClassification, test_data_loader: PromptDataLoader, criterion: torch.nn.Module) -> None:
-    test_loss = test_acc = test_f1 = 0
+def test(
+    model: PromptForClassification,
+    test_data_loader: PromptDataLoader,
+    criterion: torch.nn.Module,
+    early_stopping: EarlyStopping,
+    epoch: int,
+) -> None:
+
+    device = model.device
+    evaluator = Evaluator()
+
     with torch.no_grad():
         for inputs in tqdm(test_data_loader):
-            loss, acc, f1 = evaluation(inputs, model, criterion)
-            test_loss += loss.item()
-            test_acc += acc
-            test_f1 += f1
-    print_result(
-        test_type="test", step=len(test_data_loader), loss=test_loss, accuracy_score=test_acc, f1_score=test_f1
+            inputs = inputs.to(device)
+            logits = model(inputs)
+            predicts = torch.argmax(logits, dim=1).cpu().numpy()
+            labels = inputs.label.cpu().numpy()
+            guids = inputs.guid.cpu().numpy()
+            loss = criterion(logits, inputs.label)
+            evaluator.save(labels, predicts, guids, loss.item())
+            del inputs, loss
+            break
+    evaluator.compute()
+    standard_value = evaluator.loss if early_stopping.standard == EarlyStopping.LOSS else evaluator.joint_goal_acc
+    early_stopping(model, standard_value)
+
+    print_test(
+        loss=evaluator.loss,
+        accuracy=evaluator.acc,
+        f1_score=evaluator.f1_score,
+        joint_goal_accuracy=evaluator.joint_goal_acc,
+        epoch=epoch,
     )
+    torch.cuda.empty_cache()
 
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
 def main(cfg: DictConfig) -> None:
-
+    experiment_description = input("experiment description : ")
     seed_everything(cfg.seed)
     log.info(cfg)
-    plm, tokenizer, model_config, WrapperClass = load_plm(model_name=cfg.model.name, model_path=cfg.model.path)
-    nli_data_module: PromptNliDataModule = hydra.utils.instantiate(cfg.dataset.nli)
+
+    date_folder = sorted(os.listdir("./outputs"))[-1]
+    time_folder = sorted(os.listdir(f"./outputs/{date_folder}"))[-1]
+    wandb.init(
+        project="CS-broker",
+        entity="ekzm8523",
+        config=cfg,
+        name=f"{date_folder}-{time_folder}",
+        notes=experiment_description,
+    )
+
+    model_class = get_model_class(plm_type=cfg.model.name)
+    plm = model_class.model.from_pretrained(cfg.model.path, use_auth_token=HUGGING_FACE_ACCESS_TOKEN)
+    tokenizer = model_class.tokenizer.from_pretrained(cfg.model.path, use_auth_token=HUGGING_FACE_ACCESS_TOKEN)
 
     special_tokens = ["</s>", "<unk>", "<pad>"]
     special_tokens_dict = {"additional_special_tokens": special_tokens}
@@ -101,26 +135,35 @@ def main(cfg: DictConfig) -> None:
     log.info(f"{num_added_tokens}개의 special token 생성")
     log.info(f"new special_token : {special_tokens}")
 
+    WrapperClass = model_class.wrapper
     template_text = '{"placeholder":"text_a"} Question: {"placeholder":"text_b"}? Is it correct? {"mask"}.'
     template = ManualTemplate(tokenizer=tokenizer, text=template_text)
 
     prompt_loader: PromptLoader = hydra.utils.instantiate(cfg.dataset.loader)
-    train_data_loader, val_data_loader, test_data_loader = [
-        prompt_loader.get_loader(
-            dataset=nli_data_module.prompt_input_dataset[data_type],
-            template=template,
-            tokenizer=tokenizer,
-            tokenizer_wrapper_class=WrapperClass,
-        )
-        for data_type in ["train", "val", "test"]
-    ]
+
+    train_data_module: Union[PromptLabeledDataModule, PromptNliDataModule] = hydra.utils.instantiate(cfg.dataset.train)
+    test_data_module: PromptLabeledDataModule = hydra.utils.instantiate(cfg.dataset.test)
+    train_data_loader = prompt_loader.get_loader(
+        dataset=train_data_module.prompt_input_dataset,
+        template=template,
+        tokenizer=tokenizer,
+        tokenizer_wrapper_class=WrapperClass,
+    )
+    test_data_loader = prompt_loader.get_loader(
+        dataset=test_data_module.prompt_input_dataset,
+        template=template,
+        tokenizer=tokenizer,
+        tokenizer_wrapper_class=WrapperClass,
+    )
+
     verbalizer = ManualVerbalizer(tokenizer=tokenizer, num_classes=2, label_words=[["yes"], ["no"]])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"running on : {device}")
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
+    if cfg.use_pretrained_model:
+        prompt_model.load_state_dict(torch.load(cfg.paths.pretrain_model_path))
     prompt_model.to(device)
-    prompt_model.load_state_dict(torch.load("./jw-mt5-base.bin"))
     criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
@@ -136,39 +179,23 @@ def main(cfg: DictConfig) -> None:
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=cfg.lr)
     train(
-        epochs=cfg.epochs,
+        cfg=cfg,
         model=prompt_model,
         train_data_loader=train_data_loader,
-        val_data_loader=val_data_loader,
+        val_data_loader=test_data_loader,
         criterion=criterion,
         optimizer=optimizer,
-        logging_steps=cfg.logging_steps,
     )
 
-    test(model=prompt_model, test_data_loader=test_data_loader, criterion=criterion)
-
-    labeled_data_module: PromptLabeledDataModule = hydra.utils.instantiate(cfg.dataset.labeled)
-    train_data_loader, val_data_loader, test_data_loader = [
-        prompt_loader.get_loader(
-            dataset=labeled_data_module.prompt_input_dataset[data_type],
-            template=template,
-            tokenizer=tokenizer,
-            tokenizer_wrapper_class=WrapperClass,
+    local_model_path = f"outputs/{date_folder}/{time_folder}/best_model.pt"
+    if cfg.upload_model_to_s3:
+        folder = f"ai-models/{date_folder}/{time_folder}"
+        upload_model_to_s3(
+            local_path=local_model_path,
+            bucket=cfg.s3_bucket,
+            folder=folder,
+            model_name="best_model.pt",
         )
-        for data_type in ["train", "val", "test"]
-    ]
-
-    train(
-        epochs=cfg.epochs,
-        model=prompt_model,
-        train_data_loader=train_data_loader,
-        val_data_loader=val_data_loader,
-        criterion=criterion,
-        optimizer=optimizer,
-        logging_steps=cfg.logging_steps,
-    )
-
-    test(model=prompt_model, test_data_loader=test_data_loader, criterion=criterion)
 
 
 if __name__ == "__main__":
