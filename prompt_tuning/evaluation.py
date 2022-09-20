@@ -9,6 +9,8 @@ class Evaluator:
     def __init__(self):
         self.prediction_dict = defaultdict(list)
         self.label_dict = defaultdict(list)
+        self.loss_sum = 0
+        self.save_total = 0
         self._init()
 
     def _init(self):
@@ -16,13 +18,13 @@ class Evaluator:
         self.all_hit = 0
         self.f1_sum = 0
         self.acc_sum = 0
-        self.loss_sum = 0
 
     def save(self, labels: ndarray, predicts: ndarray, guids: ndarray, loss: float) -> None:
         for label, predict, guid in zip(labels, predicts, guids):
             self.prediction_dict[guid].append(predict)
             self.label_dict[guid].append(label)
         self.loss_sum += loss
+        self.save_total += 1
 
     def compute(self) -> None:
         self._init()
@@ -52,4 +54,4 @@ class Evaluator:
 
     @property
     def loss(self) -> float:
-        return self.loss_sum / self.all_hit if self.all_hit != 0 else 0
+        return self.loss_sum / self.save_total if self.save_total != 0 else 0

@@ -60,7 +60,6 @@ def train(
             if (step + 1) % cfg.logging_steps == 0 and (step + 1) >= cfg.logging_steps:
                 print_train(epoch=epoch, loss=total_loss / (step + 1))
             torch.cuda.empty_cache()
-            break
 
         test(model, val_data_loader, criterion, early_stopping)
 
@@ -90,9 +89,8 @@ def test(
             loss = criterion(logits, inputs.label)
             evaluator.save(labels, predicts, guids, loss.item())
             del inputs, loss
-            break
     evaluator.compute()
-    early_stopping(evaluator.loss, model, evaluator.acc)
+    early_stopping(model, evaluator.joint_goal_acc)
 
     print_test(
         loss=evaluator.loss,
@@ -155,7 +153,7 @@ def main(cfg: DictConfig) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"running on : {device}")
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
-    # prompt_model.load_state_dict(torch.load("./outputs/2022-09-18/18-10-05/best_model.pt"))
+    prompt_model.load_state_dict(torch.load("./outputs/2022-09-20/03-46-57/best_model.pt"))
     prompt_model.to(device)
     criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]

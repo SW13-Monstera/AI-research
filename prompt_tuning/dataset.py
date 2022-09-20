@@ -3,13 +3,13 @@ from typing import List
 
 import numpy as np
 import pandas as pd
+from datasets import DatasetDict, load_dataset
 from openprompt import PromptDataLoader
 from openprompt.data_utils import InputExample
 from openprompt.prompts import ManualTemplate
 from pydantic import BaseModel
 from transformers import PreTrainedTokenizer
 
-from datasets import DatasetDict, load_dataset
 from prompt_tuning.utils import log
 
 
@@ -120,6 +120,7 @@ class PromptLabeledDataModule:
     def _load_labeled_dataset(csv_path: str) -> List[RequiredGradingData]:
         df = pd.read_csv(csv_path)
         log.info(f"previous data size : {len(df)}")
+        df.dropna(axis=0, subset=["user_answer"], inplace=True)  # 빈 답변 제거
         df["user_answer"] = df["user_answer"].apply(
             lambda x: x.strip().replace("\n", "").replace("\xa0", "").replace("  ", " ")
         )
