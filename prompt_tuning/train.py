@@ -4,7 +4,6 @@ from typing import Union
 import hydra
 import pyrootutils
 import torch
-import wandb
 from loss import EarlyStopping
 from omegaconf import DictConfig
 from openprompt import PromptDataLoader, PromptForClassification
@@ -13,6 +12,7 @@ from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from tqdm import tqdm
 from utils import log, print_test, print_train, seed_everything
 
+import wandb
 from core.config import HUGGING_FACE_ACCESS_TOKEN
 from prompt_tuning.dataset import (
     PromptLabeledDataModule,
@@ -64,7 +64,6 @@ def train(
             if (step + 1) % cfg.logging_steps == 0 and (step + 1) >= cfg.logging_steps:
                 print_train(epoch=epoch, loss=total_loss / (step + 1))
             torch.cuda.empty_cache()
-            break
         test(model, val_data_loader, criterion, early_stopping, epoch)
 
         if early_stopping.early_stop:
@@ -94,7 +93,6 @@ def test(
             loss = criterion(logits, inputs.label)
             evaluator.save(labels, predicts, guids, loss.item())
             del inputs, loss
-            break
     evaluator.compute()
     standard_value = evaluator.loss if early_stopping.standard == EarlyStopping.LOSS else evaluator.joint_goal_acc
     early_stopping(model, standard_value)
@@ -111,7 +109,7 @@ def test(
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
 def main(cfg: DictConfig) -> None:
-    # experiment_description = input("experiment description : ")
+    experiment_description = input("experiment description : ")
     seed_everything(cfg.seed)
     log.info(cfg)
 
@@ -122,7 +120,7 @@ def main(cfg: DictConfig) -> None:
         entity="ekzm8523",
         config=cfg,
         name=f"{date_folder}-{time_folder}",
-        # notes=experiment_description,
+        notes=experiment_description,
     )
 
     model_class = get_model_class(plm_type=cfg.model.name)
@@ -163,6 +161,7 @@ def main(cfg: DictConfig) -> None:
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
     if cfg.use_pretrained_model:
         prompt_model.load_state_dict(torch.load(cfg.paths.pretrain_model_path))
+        log.info(f"{cfg.paths.pretrain_model_path} 모델 사용")
     prompt_model.to(device)
     criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]

@@ -43,13 +43,13 @@ ckpt_path: null
 
 seed: 42
 epochs: 30
-lr: 0.0001
+lr: 0.0001815166491931944
 logging_steps: 100
-weight_decay: 0.1
+weight_decay: 0.2
 early_stopping: 7
 upload_model_to_s3: True
 s3_bucket: cs-broker-bucket
-optimizer: "adamw"
+optimizer: "adamp"
 huggingface_repo: ekzm8523/cs-boker-mt5-base
 
-use_pretrained_model: False
+use_pretrained_model: True
