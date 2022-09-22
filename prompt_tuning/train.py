@@ -10,7 +10,7 @@ from openprompt import PromptDataLoader, PromptForClassification
 from openprompt.plms import get_model_class
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from tqdm import tqdm
-from utils import log, print_test, print_train, seed_everything
+from utils import log, print_test, print_train, seed_everything, upload_model_to_s3
 
 import wandb
 from core.config import HUGGING_FACE_ACCESS_TOKEN
@@ -186,15 +186,15 @@ def main(cfg: DictConfig) -> None:
         optimizer=optimizer,
     )
 
-    # local_model_path = f"outputs/{date_folder}/{time_folder}/best_model.pt"
-    # if cfg.upload_model_to_s3:
-    #     folder = f"ai-models/{date_folder}/{time_folder}"
-    #     upload_model_to_s3(
-    #         local_path=local_model_path,
-    #         bucket=cfg.s3_bucket,
-    #         folder=folder,
-    #         model_name="best_model.pt",
-    #     )
+    local_model_path = f"outputs/{date_folder}/{time_folder}/best_model.pt"
+    if cfg.upload_model_to_s3:
+        folder = f"ai-models/{date_folder}/{time_folder}"
+        upload_model_to_s3(
+            local_path=local_model_path,
+            bucket=cfg.s3_bucket,
+            folder=folder,
+            model_name="best_model.pt",
+        )
 
 
 if __name__ == "__main__":
