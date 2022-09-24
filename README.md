@@ -60,6 +60,10 @@ T5 모델을 Prompt Tuning 하여 사용합니다.
 
 Prompt Tuning의 예시입니다.
 
+![스크린샷 2022-09-21 오후 9 51 08](https://user-images.githubusercontent.com/67869514/192099317-4211eee5-0fcb-48fe-912e-dc595ef57506.png)
+
+Wandb Sweep을 통한 하이퍼 파라이터 최적화
+
 ### 정리된 슬라이드 : [Google Slide](https://docs.google.com/presentation/d/1TWTurKIexCGG0GJZRPvv_XQyipcFerA3x7cPF42fQ7o/edit#slide=id.g1567aa70b70_0_45)
 
 
