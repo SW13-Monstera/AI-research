@@ -4,4 +4,4 @@ data_dir: ${paths.root_dir}/static/
 
 ckpt_dir: ${paths.root_dir}/ckpt/
 
-pretrain_model_path: ${paths.root_dir}/prompt_tuning/outputs/2022-09-20/03-46-57/best_model.pt
+pretrain_model_path: ${paths.root_dir}/prompt_tuning/outputs/2022-09-18/18-10-05/best_model.pt

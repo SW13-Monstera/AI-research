@@ -32,7 +32,7 @@ def print_train(loss: float, epoch: int) -> None:
 def print_test(loss: float, accuracy: float, f1_score: float, joint_goal_accuracy: float, epoch: int) -> None:
     log.info(f"[test] loss: {loss} accuracy: {accuracy} f1_score: {f1_score} JGA: {joint_goal_accuracy}")
     wandb.log(
-        {"epoch": epoch, "val loss": loss, "accuracy": accuracy, "f1_score": f1_score, "JGA": joint_goal_accuracy}
+        {"epoch": epoch, "val_loss": loss, "accuracy": accuracy, "f1_score": f1_score, "JGA": joint_goal_accuracy}
     )
 
 

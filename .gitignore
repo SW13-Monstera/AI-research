@@ -131,3 +131,5 @@ dmypy.json
 
 prompt_tuning/outputs/
 prompt_tuning/wandb/
+outputs/
+wandb/

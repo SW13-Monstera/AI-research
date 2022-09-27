@@ -4,16 +4,15 @@ from typing import Union
 import hydra
 import pyrootutils
 import torch
-import wandb
 from loss import EarlyStopping
 from omegaconf import DictConfig
 from openprompt import PromptDataLoader, PromptForClassification
 from openprompt.plms import get_model_class
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
-from torch.optim import AdamW
 from tqdm import tqdm
 from utils import log, print_test, print_train, seed_everything, upload_model_to_s3
 
+import wandb
 from core.config import HUGGING_FACE_ACCESS_TOKEN
 from prompt_tuning.dataset import (
     PromptLabeledDataModule,
@@ -21,6 +20,7 @@ from prompt_tuning.dataset import (
     PromptNliDataModule,
 )
 from prompt_tuning.evaluation import Evaluator
+from prompt_tuning.optimizer import get_optimizer
 
 root = pyrootutils.setup_root(
     search_from=__file__,
@@ -64,7 +64,6 @@ def train(
             if (step + 1) % cfg.logging_steps == 0 and (step + 1) >= cfg.logging_steps:
                 print_train(epoch=epoch, loss=total_loss / (step + 1))
             torch.cuda.empty_cache()
-            break
         test(model, val_data_loader, criterion, early_stopping, epoch)
 
         if early_stopping.early_stop:
@@ -94,7 +93,6 @@ def test(
             loss = criterion(logits, inputs.label)
             evaluator.save(labels, predicts, guids, loss.item())
             del inputs, loss
-            break
     evaluator.compute()
     standard_value = evaluator.loss if early_stopping.standard == EarlyStopping.LOSS else evaluator.joint_goal_acc
     early_stopping(model, standard_value)
@@ -163,6 +161,7 @@ def main(cfg: DictConfig) -> None:
     prompt_model = PromptForClassification(plm=plm, template=template, verbalizer=verbalizer)  # freeze 고려
     if cfg.use_pretrained_model:
         prompt_model.load_state_dict(torch.load(cfg.paths.pretrain_model_path))
+        log.info(f"{cfg.paths.pretrain_model_path} 모델 사용")
     prompt_model.to(device)
     criterion = torch.nn.CrossEntropyLoss()  # loss 생각해보기
     no_decay = ["bias", "LayerNorm.weight"]
@@ -177,7 +176,7 @@ def main(cfg: DictConfig) -> None:
         },
     ]
 
-    optimizer = AdamW(optimizer_grouped_parameters, lr=cfg.lr)
+    optimizer = get_optimizer(cfg.optimizer, optimizer_grouped_parameters, learning_rate=cfg.lr)
     train(
         cfg=cfg,
         model=prompt_model,
