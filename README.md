@@ -24,6 +24,7 @@ pip3 install openprompt torch hydra-core pyrootutils scikit-learn pydantic
 
 🔗 배포: <https://csbroker.io>
 
+🛠 기술 스택: `Pytorch`, `SBERT`, `MT-5`, `prompt tuning`, `WandB`, `Hydra`
 <br/>
 
 ## 👋 소개
