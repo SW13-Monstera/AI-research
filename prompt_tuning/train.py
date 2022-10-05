@@ -11,7 +11,7 @@ from openprompt import PromptDataLoader, PromptForClassification
 from openprompt.plms import get_model_class
 from openprompt.prompts import ManualTemplate, ManualVerbalizer
 from tqdm import tqdm
-from utils import log, print_test, print_train, seed_everything
+from utils import log, print_test, print_train, seed_everything, upload_model_to_s3
 
 from core.config import HUGGING_FACE_ACCESS_TOKEN
 from prompt_tuning.dataset import (
@@ -38,7 +38,6 @@ def train(
     criterion: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
 ) -> None:
-    # wandb.watch(model, criterion, log="all", log_freq=100)
     date_folder = sorted(os.listdir("./outputs"))[-1]
     time_folder = sorted(os.listdir(f"./outputs/{date_folder}"))[-1]
     early_stopping_standard = EarlyStopping.LOSS if cfg.dataset.name == "nli" else EarlyStopping.JGA
@@ -111,7 +110,7 @@ def test(
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
 def main(cfg: DictConfig) -> None:
-    # experiment_description = input("experiment description : ")
+    experiment_description = input("experiment description : ")
     seed_everything(cfg.seed)
     log.info(cfg)
 
@@ -122,7 +121,7 @@ def main(cfg: DictConfig) -> None:
         entity="ekzm8523",
         config=cfg,
         name=f"{date_folder}-{time_folder}",
-        # notes=experiment_description,
+        notes=experiment_description,
     )
 
     model_class = get_model_class(plm_type=cfg.model.name)
@@ -187,15 +186,15 @@ def main(cfg: DictConfig) -> None:
         optimizer=optimizer,
     )
 
-    # local_model_path = f"outputs/{date_folder}/{time_folder}/best_model.pt"
-    # if cfg.upload_model_to_s3:
-    #     folder = f"ai-models/{date_folder}/{time_folder}"
-    #     upload_model_to_s3(
-    #         local_path=local_model_path,
-    #         bucket=cfg.s3_bucket,
-    #         folder=folder,
-    #         model_name="best_model.pt",
-    #     )
+    local_model_path = f"outputs/{date_folder}/{time_folder}/best_model.pt"
+    if cfg.upload_model_to_s3:
+        folder = f"ai-models/{date_folder}/{time_folder}"
+        upload_model_to_s3(
+            local_path=local_model_path,
+            bucket=cfg.s3_bucket,
+            folder=folder,
+            model_name="best_model.pt",
+        )
 
 
 if __name__ == "__main__":

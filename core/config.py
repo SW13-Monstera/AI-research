@@ -3,7 +3,7 @@ import logging
 import boto3
 from botocore.exceptions import ClientError
 
-session = boto3.Session(profile_name="cs-broker")
+session = boto3.Session()
 secret_manager = session.client(service_name="secretsmanager", region_name="ap-northeast-2")
 log = logging.getLogger("__main__")
 log.setLevel(logging.INFO)
