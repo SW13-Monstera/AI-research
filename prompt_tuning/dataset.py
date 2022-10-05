@@ -3,13 +3,13 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-from datasets import DatasetDict, load_dataset
 from openprompt import PromptDataLoader
 from openprompt.data_utils import InputExample
 from openprompt.prompts import ManualTemplate
 from pydantic import BaseModel
 from transformers import PreTrainedTokenizer
 
+from datasets import DatasetDict, load_dataset
 from prompt_tuning.utils import log
 
 
@@ -128,22 +128,20 @@ class PromptLabeledDataModule:
         df.dropna(axis=0, subset=["user_answer"], inplace=True)  # 빈 답변 제거
         log.info(f"after data size : {len(df)}")
 
-        if isinstance(df["correct_scoring_criterion"][0], str):  # list를 string으로 표현된 경우 type casting
-            df["correct_scoring_criterion"] = df["correct_scoring_criterion"].apply(eval)
-        if isinstance(df["scoring_criterion"][0], str):
-            df["scoring_criterion"] = df["scoring_criterion"].apply(eval)
+        df.correct_content_standards = df.correct_content_standards.apply(eval)
+        df.content_standards = df.content_standards.apply(eval)
 
         dataset = []
         for row_data in df.itertuples():
-            for i, criterion in enumerate(row_data.scoring_criterion):
+            for i, content_standard in enumerate(row_data.content_standards):
                 data = RequiredGradingData(
                     problem_id=row_data.problem_id,
                     answer_id=row_data.Index,
                     guid=f"{row_data.Index}-{i}",
                     source="CS-broker",
                     premise=row_data.user_answer,
-                    hypothesis=criterion,
-                    label=1 if criterion in row_data.correct_scoring_criterion else 0,
+                    hypothesis=content_standard,
+                    label=1 if content_standard in row_data.correct_content_standards else 0,
                     criterion_idx=i,
                 )
                 dataset.append(data)

@@ -4,7 +4,6 @@ from typing import Union
 import hydra
 import pyrootutils
 import torch
-import wandb
 from loss import EarlyStopping
 from omegaconf import DictConfig
 from openprompt import PromptDataLoader, PromptForClassification
@@ -110,19 +109,19 @@ def test(
 
 @hydra.main(version_base="1.2", config_path=root / "configs", config_name="main.yaml")
 def main(cfg: DictConfig) -> None:
-    experiment_description = input("experiment description : ")
+    # experiment_description = input("experiment description : ")
     seed_everything(cfg.seed)
     log.info(cfg)
 
     date_folder = sorted(os.listdir("./outputs"))[-1]
     time_folder = sorted(os.listdir(f"./outputs/{date_folder}"))[-1]
-    wandb.init(
-        project="CS-broker",
-        entity="ekzm8523",
-        config=cfg,
-        name=f"{date_folder}-{time_folder}",
-        notes=experiment_description,
-    )
+    # wandb.init(
+    #     project="CS-broker",
+    #     entity="ekzm8523",
+    #     config=cfg,
+    #     name=f"{date_folder}-{time_folder}",
+    #     notes=experiment_description,
+    # )
 
     model_class = get_model_class(plm_type=cfg.model.name)
     plm = model_class.model.from_pretrained(cfg.model.path, use_auth_token=HUGGING_FACE_ACCESS_TOKEN)
