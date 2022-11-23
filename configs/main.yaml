@@ -43,10 +43,10 @@ ckpt_path: null
 
 seed: 42
 epochs: 30
-lr: 0.0001
+lr: 0.0001815166491931944
 logging_steps: 100
 weight_decay: 0.1
-early_stopping: 7
+early_stopping: 10
 upload_model_to_s3: True
 s3_bucket: cs-broker-bucket
 optimizer: "adamw"

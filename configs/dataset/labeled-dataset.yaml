@@ -5,6 +5,7 @@ train:
   seed: 42
   dataset_path: ${oc.env:PROJECT_ROOT}/static/augmented_train.csv
   shuffle: False
+  use_standard_answer: True
 
 
 test:

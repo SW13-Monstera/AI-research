@@ -3,12 +3,14 @@ from typing import List
 
 import numpy as np
 import pandas as pd
+import pymysql
 from openprompt import PromptDataLoader
 from openprompt.data_utils import InputExample
 from openprompt.prompts import ManualTemplate
 from pydantic import BaseModel
 from transformers import PreTrainedTokenizer
 
+from core.config import DB_HOST, DB_NAME, DB_PASSWORD, DB_USER
 from datasets import DatasetDict, load_dataset
 from prompt_tuning.utils import log
 
@@ -110,10 +112,14 @@ class PromptNliDataModule:
 
 
 class PromptLabeledDataModule:
-    def __init__(self, dataset_path: str, seed: int = 42, shuffle: bool = False) -> None:
+    def __init__(
+        self, dataset_path: str, seed: int = 42, shuffle: bool = False, use_standard_answer: bool = False
+    ) -> None:
         self.seed: int = seed
         self.shuffle: bool = shuffle
         self.dataset: List[RequiredGradingData] = self._load_labeled_dataset(dataset_path)
+        if use_standard_answer:
+            self._get_standard_answer()
         self.prompt_input_dataset: List[InputExample] = self._convert_to_prompt_input_dataset()
 
     @staticmethod
@@ -158,3 +164,35 @@ class PromptLabeledDataModule:
             )
             train_dataset.append(input_example)
         return train_dataset
+
+    def _get_standard_answer(self):
+
+        db = pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, db=DB_NAME, charset="utf8")
+        cursor = db.cursor()
+        query = """
+        SELECT p.problem_id, lp.standard_answer, gs.content, gs.grading_standard_id
+          FROM problem AS p
+               JOIN long_problem AS lp
+                 ON p.problem_id = lp.problem_id
+               JOIN grading_standard AS gs
+                 ON p.problem_id = gs.problem_id
+         WHERE gs.type = "CONTENT"
+        """  # noqa
+
+        cursor.execute(query)
+        result = cursor.fetchall()
+        for i, (problem_id, standard_answer, content_standard, standard_id) in enumerate(result):
+            self.dataset.append(
+                RequiredGradingData(
+                    problem_id=problem_id,
+                    answer_id=problem_id,
+                    guid=f"{problem_id}-{standard_id}",
+                    source="CS-broker",
+                    premise=standard_answer,
+                    hypothesis=content_standard,
+                    label=1,
+                    criterion_idx=i,
+                )
+            )
+        db.commit()
+        db.close()
